@@ -1,0 +1,14 @@
+[
+    {
+        "name": "RULE NAME",
+        "alt_names":[
+            "function_name_to_look_for"
+        ],
+        "wrappers":true,
+        "mark_if":{
+            "High":"True",
+            "Medium":"False",
+            "Low": "False"
+        }
+    }
+]
