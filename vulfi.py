@@ -801,7 +801,11 @@ class VulFi(idaapi.action_handler_t):
             vulfi_data = json.loads(node.getblob(1,"S"))
         else:
             vulfi_data = {}
-        if vulfi_data and (answer := ida_kernwin.ask_buttons("Load Existing","Scan Again","Cancel",1,f"Previous scan results found.")) == 1:
+        if vulfi_data:
+            answer = ida_kernwin.ask_buttons("Load Existing","Scan Again","Cancel",1,f"Previous scan results found.")
+        else:
+            answer = 2
+        if vulfi_data and answer == 1:
             for item in vulfi_data:
                 rows.append([vulfi_data[item]["name"],vulfi_data[item]["function"],vulfi_data[item]["in"],vulfi_data[item]["addr"],vulfi_data[item]["status"],vulfi_data[item]["priority"],vulfi_data[item]["comment"]])
                 marked_addrs.append(f'{vulfi_data[item]["name"]}_{vulfi_data[item]["addr"]}')
