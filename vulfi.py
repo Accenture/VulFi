@@ -146,9 +146,11 @@ class VulFiScanner:
                     # Name of the function where the xref is located
                     found_in_name = utils.get_func_name(scanned_function_xref)
                     priority = ""
-                    # Every xref will be marked as High in case that params fetch fails
+                    # Every xref will be marked as Info in case that params fetch fails
                     try:
-                        if not param or eval(rule["mark_if"]["High"],dict(self=self, param=param,param_count=param_count,function_call=function_call)):
+                        if not param:
+                            priority = "Info"
+                        elif eval(rule["mark_if"]["High"],dict(self=self, param=param,param_count=param_count,function_call=function_call)):
                             priority = "High"
                         elif eval(rule["mark_if"]["Medium"],dict(self=self, param=param,param_count=param_count,function_call=function_call)):
                             priority = "Medium"
@@ -157,8 +159,8 @@ class VulFiScanner:
                         
                     except IndexError:
                         # Decompiler output has fewer parameters than the function prototype
-                        # Mark the issue with low priority
-                        priority = "Low"
+                        # Mark the issue with Info priority
+                        priority = "Info"
                         #results.append(list(VulFi.result_window_row(rule["name"],scanned_function_display_name,found_in_name,hex(scanned_function_xref),"Not Checked","Low","")))
                     except Exception:
                         print(traceback.format_exc())
