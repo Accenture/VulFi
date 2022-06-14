@@ -24,7 +24,7 @@ Once the scan is completed or once the previous results are loaded a table will 
 * **FoundIn** - The function that contains the potentially interesting reference.
 * **Address** - The address of the detected call.
 * **Status** - The review status, initial `Not Checked` is assigned to every new item. The other statuses are `False Positive`, `Suspicious` and `Vulnerable`. Those can be set using a right-click menu on a given item and should reflect the results of the manual review of the given function call.
-* **Priority** - An attempt to prioritize more interesting calls over the less interesting ones. Possible values are `High`, `Medium` and `Low`. The priorities are defined along with other rules in `vulfi_rules.json` file.
+* **Priority** - An attempt to prioritize more interesting calls over the less interesting ones. Possible values are `High`, `Medium` and `Low` (also `Info` for cases where the scanner was not able to identify all parameters properly). The priorities are defined along with other rules in `vulfi_rules.json` file.
 * **Comment** - A user defined comment for the given item.
 
 In case that there are no data inside the `idb`/`i64` file or user decides to perform a new scan. The plugin will ask whether it should run the scan using the default included rules or whether it should use a custom rules file. Please note that running a new scan with already existing data does not overwrite the previously found items identified by the rule with the same name as the one with previously stored results. Therefore, running the scan again does not delete existing comments and status updates.
