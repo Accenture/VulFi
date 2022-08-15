@@ -31,13 +31,16 @@ class utils:
 
     def get_func_name(ea):
         # Get pretty function name
-        ret_func_name = ""
-        demangled_name = idc.demangle_name(idc.get_func_name(ea),idc.get_inf_attr(idc.INF_SHORT_DN))
-        if demangled_name:
-            ret_func_name = demangled_name[:demangled_name.find("(")]
-        else:
-            ret_func_name = idc.get_func_name(ea)
-        return ret_func_name
+        return utils.get_pretty_func_name(idc.get_func_name(ea))
+
+    def get_pretty_func_name(name):
+        # Demangle function name
+        demangled_name = idc.demangle_name(name, idc.get_inf_attr(idc.INF_SHORT_DN))
+        # Return as is if failed to demangle
+        if not demangled_name:
+            return name
+        # Cut arguments
+        return demangled_name[:demangled_name.find("(")]
 
 class null_after_visitor(ida_hexrays.ctree_visitor_t):
     def __init__(self,decompiled_function,call_xref,func_name,matched):
@@ -73,6 +76,8 @@ class null_after_visitor(ida_hexrays.ctree_visitor_t):
 
 class VulFiScanner:
     def __init__(self,custom_rules=None):
+        # Init class-wide variables
+        self.functions_list = []
         if not custom_rules:
             with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),"vulfi_rules.json"),"r") as rules_file:
                 self.rules = json.load(rules_file)
@@ -101,6 +106,7 @@ class VulFiScanner:
     def start_scan(self,ignore_addr_list):
         results = []
         ida_kernwin.show_wait_box("VulFi scan running ... ")
+        self.prepare_functions_list()
         for rule in self.rules:
             xrefs_dict = self.find_xrefs_by_name(rule["alt_names"],rule["wrappers"])
             for scanned_function in xrefs_dict:
@@ -177,18 +183,15 @@ class VulFiScanner:
         ida_kernwin.hide_wait_box()                      
         return results
 
-    # Returns a list of all xrefs to the function with specified name
-    def find_xrefs_by_name(self,function_names,wrappers):
-        xrefs_list = {}
-        functions_list = []
-        insn = ida_ua.insn_t()
+    def prepare_functions_list(self):
+        self.functions_list = []
         # Gather all functions in all segments
         for segment in idautils.Segments():
-            functions_list.extend(list(idautils.Functions(idc.get_segm_start(segment),idc.get_segm_end(segment))))
+            self.functions_list.extend(list(idautils.Functions(idc.get_segm_start(segment),idc.get_segm_end(segment))))
         
         # Gather imports
         def imports_callback(ea, name, ordinal):
-            functions_list.append(ea)
+            self.functions_list.append(ea)
             return True
 
         # For each import
@@ -196,46 +199,61 @@ class VulFiScanner:
         for i in range(0, number_of_imports):
             idaapi.enum_import_names(i, imports_callback)
 
+    # Returns a list of all xrefs to the function with specified name
+    def find_xrefs_by_name(self,function_names,wrappers):
+        xrefs_list = {}
+        insn = ida_ua.insn_t()
+
+        # Convert function names to expected format (demangle them if possible)
+        function_names = list(map(utils.get_pretty_func_name, function_names))
+
         # For all addresses of functions and imports check if it is function we are looking for
-        for function_address in functions_list:
-            current_function_name = utils.get_func_name(function_address).lower()
+        for function_address in self.functions_list:
+            current_function_name = utils.get_func_name(function_address)
             if not current_function_name:
-                current_function_name = ida_name.get_ea_name(function_address).lower()
+                current_function_name = ida_name.get_ea_name(function_address)
             # If the type is not defined and the name of the function is known set the type
-            if current_function_name in self.prototypes:
-                idc.SetType(function_address,self.prototypes[current_function_name])
+            prototype = self.prototypes.get(current_function_name.lower(), None)
+            if prototype is not None:
+                idc.SetType(function_address, prototype)
                 idaapi.auto_wait()
             
-            if current_function_name in function_names:
-                # This is the function we are looking for
-                if current_function_name not in xrefs_list.keys():
-                    xrefs_list[current_function_name] = []
-                for xref in idautils.XrefsTo(function_address):
-                    # This rules out any functions within those that we are already looking at (wrapped)
-                    # It also makes sure that functions that are not xrefed within another function are not displayed
-                    xref_func_name = utils.get_func_name(xref.frm)
-                    if not xref_func_name or xref_func_name.lower() in function_names:
-                        continue
-                    # Make sure that the instrution is indeed a call
-                    if ida_ua.decode_insn(insn,xref.frm) != idc.BADADDR:
-                        if (insn.get_canon_feature() & 0x2 == 0x2 or # The instruction is a call
-                        (insn.get_canon_feature() & 0xfff == 0x100 and insn.Op1.type in [idc.o_near,idc.o_far])): # The instruction uses first operand which is of type near/far immediate address
-                            xref_tuple = (xref.frm,current_function_name,current_function_name)
-                            if wrappers:
-                                # If we should look for wrappers, do not includ the wrapped xref
-                                retrieved_wrappers = self.get_wrapper_xrefs(xref.frm,current_function_name)
-                                if not retrieved_wrappers:
-                                    # No wrappers
-                                    if not xref_tuple in xrefs_list[current_function_name]:
-                                        xrefs_list[current_function_name].append(xref_tuple)
-                                else:
-                                    # Wrappers were found
-                                    wrapped_tupple = (xref_tuple[0],xref_tuple[1],f"{xref_tuple[2]} (wrapped:{len(retrieved_wrappers)})")
-                                    xrefs_list[current_function_name].append(wrapped_tupple) # this makes sure that the wrapped function is right before its wrappers
-                                    xrefs_list[current_function_name].extend(retrieved_wrappers)
-                            else:
+
+            # Seach function "as is" and "ingnore case"
+            if current_function_name not in function_names:
+                current_function_name = current_function_name.lower()
+                if current_function_name not in function_names:
+                    continue
+
+            # This is the function we are looking for
+            if current_function_name not in xrefs_list.keys():
+                xrefs_list[current_function_name] = []
+            for xref in idautils.XrefsTo(function_address):
+                # This rules out any functions within those that we are already looking at (wrapped)
+                # It also makes sure that functions that are not xrefed within another function are not displayed
+                xref_func_name = utils.get_func_name(xref.frm)
+                if not xref_func_name or xref_func_name.lower() in function_names:
+                    continue
+                # Make sure that the instrution is indeed a call
+                if ida_ua.decode_insn(insn,xref.frm) != idc.BADADDR:
+                    if (insn.get_canon_feature() & 0x2 == 0x2 or # The instruction is a call
+                    (insn.get_canon_feature() & 0xfff == 0x100 and insn.Op1.type in [idc.o_near,idc.o_far])): # The instruction uses first operand which is of type near/far immediate address
+                        xref_tuple = (xref.frm,current_function_name,current_function_name)
+                        if wrappers:
+                            # If we should look for wrappers, do not includ the wrapped xref
+                            retrieved_wrappers = self.get_wrapper_xrefs(xref.frm,current_function_name)
+                            if not retrieved_wrappers:
+                                # No wrappers
                                 if not xref_tuple in xrefs_list[current_function_name]:
                                     xrefs_list[current_function_name].append(xref_tuple)
+                            else:
+                                # Wrappers were found
+                                wrapped_tupple = (xref_tuple[0],xref_tuple[1],f"{xref_tuple[2]} (wrapped:{len(retrieved_wrappers)})")
+                                xrefs_list[current_function_name].append(wrapped_tupple) # this makes sure that the wrapped function is right before its wrappers
+                                xrefs_list[current_function_name].extend(retrieved_wrappers)
+                        else:
+                            if not xref_tuple in xrefs_list[current_function_name]:
+                                xrefs_list[current_function_name].append(xref_tuple)
         return xrefs_list
 
     # Check if the xref can be a wrapper
