@@ -716,5 +716,36 @@
             "Medium":"False",
             "Low": "False"
         }
+    },
+    {
+        "name": "Memory Leak",
+        "alt_names":[
+            "write",
+            ".write",
+            "_write"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"not param[2].is_constant()",
+            "Medium":"False",
+            "Low": "False"
+        }
+    },
+    {
+        "name": "Comparison with Dynamic Count",
+        "alt_names":[
+            "strncmp",
+            ".strncmp",
+            "_strncmp",
+            "memcmp",
+            ".memcmp",
+            "_memcmp"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"not param[2].is_constant()",
+            "Medium":"False",
+            "Low": "False"
+        }
     }
 ]
