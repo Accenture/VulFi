@@ -1,6 +1,7 @@
 from ast import expr_context
 import collections
 from email.policy import default
+from uuid import RESERVED_FUTURE
 import idaapi
 import idc
 import ida_ua
@@ -12,6 +13,10 @@ import ida_name
 import ida_hexrays
 import traceback
 
+
+# TODO on right click get selected symbol and trace it if it is a function, if not trace within the function that was right clicked
+# TODO add right click handle for decompiler
+# TODO add "is_before" feature to the Param to check if assigns/function calls occur before the use of the variable in the function call
 
 icon = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00*\x00\x00\x00&\x08\x06\x00\x00\x00\xb2\x01\t \x00\x00\x00\x01sRGB\x00\xae\xce\x1c\xe9\x00\x00\x00\x04gAMA\x00\x00\xb1\x8f\x0b\xfca\x05\x00\x00\x00\tpHYs\x00\x00\x0e\xc3\x00\x00\x0e\xc3\x01\xc7o\xa8d\x00\x00\x02TIDATXG\xcd\x98\xcd.\x03Q\x14\xc7\xef\x10\x14-\xd5\xf8Jj!x\x00+,\xc5\x03\x88\x07\xb0\xb0\xb2\xea\x82\'\xc0\x13\x90\xb0\x15\x8f\x80x\x00+k\x89\xd8\x93\xb0\x94\xb0\x13A\xc6\xf9\xb7skz\xe7\xcc\xf4\xdc\xf9\xec/\xf9\xa5\x9d\x99\xce\xbdg\xce\xdc9\xf7N\x15\xb1@\x1e\x93\xf3\xd8\xe81\xaa\xe4\x91\xf7\xd9\xe4\x9etI\x04\xdc\x0b \xb0=\xf2\x89\xbc\xc0\x0e\r\xb2\x89@\xe1;\xb9C\x16\x05\xfaF\x80:\x9ee\xb2\x83KR\x1f\x84\xc8\xf2:\x99\x17\xe8K\xdfY\xed\x01\x19\xc0\x9fU\xbf\xb8\x80\xc0U\xa5\x08\xda\xbe%\xcd~qg\xdbc\xd3\x04\xe3\xc1<A\x9b\xf6\xf8E\x80h\x13\x01q\xfd\xb1\xd9\xd4\xe0\n\xb8\x93\xfcF6 \x00}D\x05\x081FC\xb3\xa9A#\xdc\xc9~1\x96l\x1f8I\x80Zq\xdb\xfe\xa7.J\x04\xbcEF\x81\x00\xf1\x1bI\x80\x10\xe3U\x0c\x1a\xe6\x1a\t\x13\x0f\x1c7apOr7\xad+\x8d4\xab~\xf10"`tf\x96;\x898\xc7\x1at\xc65\x96\x95\x18\x1a\xb1\xa7q\xae\xbeee\xa2\xf2\x97WV\x91\xcd\xae\xe5\xa8\x1b\x81\xb1\xd6glK\x1dp\x1c\xb7\x9fd\x8ea\x01\x92\x98\xc0\xd4\xeaxn\x0e\x97;\xf6G\xb9:Tj\x9e\xc3\x1c\x13\x15w)\x81\xa9\x15\x9d\xdeL\xd5\xdd\xdd\xf2x\xc7~\xceF\xa5\xea\x9e\xd5f\xc2\x02Mu\xa5\x86+\x0etrM\x81\xbe\xcd-\xb9\x1b\xa5\x91\xc01\xed\xf6\xe8\x98\xfbZ_tO\'\xa6\xb9\xe3\xa8\xb1"h\xb8\x89\xf8 OZ_\x83\x9c\xd7f\xd5\xda\xd0\xb0\xb7\xf5\xcf\xca`I\x1d\x8dO\xaa\x92C\xb9\xe4\xc1\xea]\x844P\xb0O>\xb7\xbe\xb6x\xfc\xfeRw_\x9f\xea\x81>\x1b\xe5\xaa\x1aq\xfe\x9bCp\x8d\xcaD\xfb7/\xbf?\xde\x916W\x9e\x99\x80\xf1\xc4\xdd\xc28ZO\x95\xb6\xc4\x99ZMcM\x95\xb6\xd8.XLQ\xdc\xb3|c\xe8 IV\x93.\xbc\xad\x88;\xb5&Zx\xc4%\xce\x82%\xd7lj0\xce\xb8`\xc2Lu\xaa\xb4%\xea\xad\xd5\xb4\x90lj\xd8\xa9\x95\x11Sea\xd9\xd4\x1c\x92\\p~3/\xee\x12\x90\xa9\xa8r\x95Kq\x97\x82\xf1\xc7\x05\ts+\xee\x12\xc2\xb2Z\xe8\x03\x14\x86\xb9`I\xe5=(+\xfcY\xed\xc9ljtV\x0b-\xeeR\xe2\xfc\x81V\x08\x19dR\xa9?"\x80\x16\n\xa6\x0c\x13@\x00\x00\x00\x00IEND\xaeB`\x82'
 icon_id = idaapi.load_custom_icon(data=icon, format="png")
@@ -371,36 +376,90 @@ class VulFiScanner:
         
         def is_constant(self):
             if self.string_value() == "" and self.number_value() == None:
+                asgs = self.__get_var_assignments()
+                if asgs: # asgs will be empty with no hexrays
+                    for asg in asgs:
+                        if self.__is_before_call(asg):
+                            if self.string_value(asg.y) == "" and self.number_value(asg.y) == None:
+                                # One of the assigns is non-const
+                                return False
+                    return True
                 return False
             else:
                 return True
 
-        def string_value(self):
+        # Returns True if the param is used in any function call specified in the "function_list" parameter
+        def used_in_call(self,function_list):
+            if self.scanner_instance.hexrays:
+                return self.used_in_call_hexrays(function_list)
+            else:
+                return self.set_to_null_after_call_disass(function_list)
+
+        def used_in_call_hexrays(self,function_list):
+            return False
+        
+        def used_in_call_disass(self,function_list):
+            return False
+
+        # Simple check whether the expression is before the call
+        # TODO no hexrays
+        # TODO test
+        def __is_before_call(self,expr):
+            if self.scanner_instance.hexrays:
+                decompiled_function = ida_hexrays.decompile(self.call_xref)
+                code = decompiled_function.pseudocode
+                for citem in decompiled_function.treeitems:
+                    if citem.to_specific_type == expr:
+                        return True
+                    if citem.ea == self.call_xref:
+                        return False
+            return False
+
+
+
+        # Returns list of assign expressions for better accuracy
+        def __get_var_assignments(self):
+            asg = []
+            if self.param.op == ida_hexrays.cot_var:
+                # Parameter is variable
+                decompiled_function = ida_hexrays.decompile(self.call_xref)
+                code = decompiled_function.pseudocode
+                for citem in decompiled_function.treeitems:
+                    if citem.op == ida_hexrays.cot_var and self.param.v.getv().name == citem.to_specific_type.v.getv().name:
+                        parent = decompiled_function.body.find_parent_of(citem)
+                        if parent.op >= ida_hexrays.cot_asg and parent.op <= ida_hexrays.cot_asgumod:
+                            # Assign operation, add to array
+                            asg.append(parent.to_specific_type)
+            return asg
+
+        def string_value(self,expr=None):
+            if not expr:
+                expr = self.param
             if self.scanner_instance.hexrays: # hexrays
-                string_val = idc.get_strlit_contents(self.param.obj_ea)
+                string_val = idc.get_strlit_contents(expr.obj_ea)
                 if string_val:
                     return string_val.decode()
                 # If it is a cast (could happen)
-                elif self.param.op == ida_hexrays.cot_cast:
+                elif expr.op == ida_hexrays.cot_cast:
                     # If casted op is object
-                    if self.param.x.op == ida_hexrays.cot_obj:
+                    if expr.x.op == ida_hexrays.cot_obj:
                         # If that object points to a string
-                        string_val = idc.get_strlit_contents(self.param.x.obj_ea)
+                        string_val = idc.get_strlit_contents(expr.x.obj_ea)
                         if string_val:
                             return string_val.decode()
-                elif self.param.op == ida_hexrays.cot_ref:
-                    string_val = idc.get_strlit_contents(self.param.x.obj_ea)
+                elif expr.op == ida_hexrays.cot_ref:
+                    string_val = idc.get_strlit_contents(expr.x.obj_ea)
                     if string_val:
                         return string_val.decode()
-                    if self.param.x.op == ida_hexrays.cot_idx:
-                        string_val = idc.get_strlit_contents(self.param.x.x.obj_ea)
+                    if expr.x.op == ida_hexrays.cot_idx:
+                        string_val = idc.get_strlit_contents(expr.x.x.obj_ea)
                         if string_val:
                             return string_val.decode()
                     # Check whether we are looking at CFString
-                    if self.param.x.obj_ea != idc.BADADDR:
-                        c_str_pointer_value = idc.get_bytes(self.param.x.obj_ea +  2* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size)
+                    if expr.x.obj_ea != idc.BADADDR:
+                        c_str_pointer_value = idc.get_bytes(expr.x.obj_ea +  2* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size)
                         tmp_ea = int.from_bytes(c_str_pointer_value,byteorder=self.scanner_instance.endian)
-                        c_str_len = int.from_bytes(idc.get_bytes(self.param.x.obj_ea +  3* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
+                        c_str_len = int.from_bytes(idc.get_bytes(expr.x.obj_ea +  3* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
                         c_string_value = idc.get_strlit_contents(tmp_ea)
                         # Having a string at this position and its length following the pointer suggests CFString struct
                         if c_string_value and len(c_string_value) == c_str_len:
@@ -408,26 +467,26 @@ class VulFiScanner:
                             return c_string_value.decode()
                 else:
                     # not a direct string
-                    byte_value = idc.get_bytes(self.param.obj_ea,self.scanner_instance.ptr_size)
+                    byte_value = idc.get_bytes(expr.obj_ea,self.scanner_instance.ptr_size)
                     tmp_ea = int.from_bytes(byte_value,byteorder=self.scanner_instance.endian)
                     string_val = idc.get_strlit_contents(tmp_ea)
                     if string_val:
                         # If this evaluates to string we have a constant
                         return string_val.decode()
             else: # No hexrays
-                if self.param.type == 0x2:
+                if expr.type == 0x2:
                     # Reference
-                    if idc.get_strlit_contents(self.param.addr):
-                        return idc.get_strlit_contents(self.param.addr).decode()
+                    if idc.get_strlit_contents(expr.addr):
+                        return idc.get_strlit_contents(expr.addr).decode()
                     else:
                         # Reference to reference
-                        addr = int.from_bytes(idc.get_bytes(self.param.addr, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
+                        addr = int.from_bytes(idc.get_bytes(expr.addr, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
                         if idc.get_strlit_contents(addr):
                             return idc.get_strlit_contents(addr).decode()
 
-                if self.param.type == 0x5:
-                    if idc.get_strlit_contents(self.param.value):
-                        return idc.get_strlit_contents(self.param.value).decode()
+                if expr.type == 0x5:
+                    if idc.get_strlit_contents(expr.value):
+                        return idc.get_strlit_contents(expr.value).decode()
                 # Reverse appoach of going from strings to calls
                 for c_string in self.scanner_instance.strings_list:
                     for str_xref in idautils.XrefsTo(c_string.ea):
@@ -451,35 +510,39 @@ class VulFiScanner:
                                         return str(c_string)
             return ""
         
-        def number_value(self):
+        def number_value(self,expr=None):
+            if not expr:
+                expr = self.param
             if self.scanner_instance.hexrays: # hexrays
                 # If it is number directly
-                if self.param.op == ida_hexrays.cot_num:
-                    return self.param.n._value
+                if expr.op == ida_hexrays.cot_num:
+                    return expr.n._value
                 # if it is a float
-                elif self.param.op == ida_hexrays.cot_fnum:
-                    return self.param.fpc.fnum.float
+                elif expr.op == ida_hexrays.cot_fnum:
+                    return expr.fpc.fnum.float
                 # If it is a cast
-                elif self.param.op == ida_hexrays.cot_cast:
-                    if self.param.x.op == ida_hexrays.cot_num:
-                        return self.param.x.n._value
-                    elif self.param.x.op == ida_hexrays.cot_fnum:
-                        return self.param.x.fpc.fnum.float
+                elif expr.op == ida_hexrays.cot_cast:
+                    if expr.x.op == ida_hexrays.cot_num:
+                        return expr.x.n._value
+                    elif expr.x.op == ida_hexrays.cot_fnum:
+                        return expr.x.fpc.fnum.float
             else: # No hexrays
                 # self.param is op_t
                 # 0x5 is immediate
-                if self.param.type == 0x5:
-                    return self.param.value
+                if expr.type == 0x5:
+                    return expr.value
             return None
 
-        def is_const_number(self):
+        def is_const_number(self,expr=None):
+            if not expr:
+                expr = self.param
             if self.scanner_instance.hexrays:
-                if self.param.op == ida_hexrays.cot_num or self.param.op == ida_hexrays.cot_fnum:
+                if expr.op == ida_hexrays.cot_num or expr.op == ida_hexrays.cot_fnum:
                     return True
-                elif self.param.op == ida_hexrays.cot_cast and self.param.x.op == ida_hexrays.cot_num:
+                elif expr.op == ida_hexrays.cot_cast and expr.x.op == ida_hexrays.cot_num:
                     return True
             else:
-                if self.param.type == 0x5:
+                if expr.type == 0x5:
                     return True
             return False
 

@@ -1,4 +1,4 @@
-# VulFi v1.0
+# VulFi v2.0
 
 ## Introduction 
 
