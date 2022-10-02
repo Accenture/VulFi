@@ -11,12 +11,10 @@ import idautils
 import ida_kernwin
 import ida_name
 import ida_hexrays
+import ida_funcs
 import traceback
 
-
-# TODO on right click get selected symbol and trace it if it is a function, if not trace within the function that was right clicked
-# TODO add right click handle for decompiler
-# TODO add "is_before" feature to the Param to check if assigns/function calls occur before the use of the variable in the function call
+# TODO used in call
 
 icon = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00*\x00\x00\x00&\x08\x06\x00\x00\x00\xb2\x01\t \x00\x00\x00\x01sRGB\x00\xae\xce\x1c\xe9\x00\x00\x00\x04gAMA\x00\x00\xb1\x8f\x0b\xfca\x05\x00\x00\x00\tpHYs\x00\x00\x0e\xc3\x00\x00\x0e\xc3\x01\xc7o\xa8d\x00\x00\x02TIDATXG\xcd\x98\xcd.\x03Q\x14\xc7\xef\x10\x14-\xd5\xf8Jj!x\x00+,\xc5\x03\x88\x07\xb0\xb0\xb2\xea\x82\'\xc0\x13\x90\xb0\x15\x8f\x80x\x00+k\x89\xd8\x93\xb0\x94\xb0\x13A\xc6\xf9\xb7skz\xe7\xcc\xf4\xdc\xf9\xec/\xf9\xa5\x9d\x99\xce\xbdg\xce\xdc9\xf7N\x15\xb1@\x1e\x93\xf3\xd8\xe81\xaa\xe4\x91\xf7\xd9\xe4\x9etI\x04\xdc\x0b \xb0=\xf2\x89\xbc\xc0\x0e\r\xb2\x89@\xe1;\xb9C\x16\x05\xfaF\x80:\x9ee\xb2\x83KR\x1f\x84\xc8\xf2:\x99\x17\xe8K\xdfY\xed\x01\x19\xc0\x9fU\xbf\xb8\x80\xc0U\xa5\x08\xda\xbe%\xcd~qg\xdbc\xd3\x04\xe3\xc1<A\x9b\xf6\xf8E\x80h\x13\x01q\xfd\xb1\xd9\xd4\xe0\n\xb8\x93\xfcF6 \x00}D\x05\x081FC\xb3\xa9A#\xdc\xc9~1\x96l\x1f8I\x80Zq\xdb\xfe\xa7.J\x04\xbcEF\x81\x00\xf1\x1bI\x80\x10\xe3U\x0c\x1a\xe6\x1a\t\x13\x0f\x1c7apOr7\xad+\x8d4\xab~\xf10"`tf\x96;\x898\xc7\x1at\xc65\x96\x95\x18\x1a\xb1\xa7q\xae\xbeee\xa2\xf2\x97WV\x91\xcd\xae\xe5\xa8\x1b\x81\xb1\xd6glK\x1dp\x1c\xb7\x9fd\x8ea\x01\x92\x98\xc0\xd4\xeaxn\x0e\x97;\xf6G\xb9:Tj\x9e\xc3\x1c\x13\x15w)\x81\xa9\x15\x9d\xdeL\xd5\xdd\xdd\xf2x\xc7~\xceF\xa5\xea\x9e\xd5f\xc2\x02Mu\xa5\x86+\x0etrM\x81\xbe\xcd-\xb9\x1b\xa5\x91\xc01\xed\xf6\xe8\x98\xfbZ_tO\'\xa6\xb9\xe3\xa8\xb1"h\xb8\x89\xf8 OZ_\x83\x9c\xd7f\xd5\xda\xd0\xb0\xb7\xf5\xcf\xca`I\x1d\x8dO\xaa\x92C\xb9\xe4\xc1\xea]\x844P\xb0O>\xb7\xbe\xb6x\xfc\xfeRw_\x9f\xea\x81>\x1b\xe5\xaa\x1aq\xfe\x9bCp\x8d\xcaD\xfb7/\xbf?\xde\x916W\x9e\x99\x80\xf1\xc4\xdd\xc28ZO\x95\xb6\xc4\x99ZMcM\x95\xb6\xd8.XLQ\xdc\xb3|c\xe8 IV\x93.\xbc\xad\x88;\xb5&Zx\xc4%\xce\x82%\xd7lj0\xce\xb8`\xc2Lu\xaa\xb4%\xea\xad\xd5\xb4\x90lj\xd8\xa9\x95\x11Sea\xd9\xd4\x1c\x92\\p~3/\xee\x12\x90\xa9\xa8r\x95Kq\x97\x82\xf1\xc7\x05\ts+\xee\x12\xc2\xb2Z\xe8\x03\x14\x86\xb9`I\xe5=(+\xfcY\xed\xc9ljtV\x0b-\xeeR\xe2\xfc\x81V\x08\x19dR\xa9?"\x80\x16\n\xa6\x0c\x13@\x00\x00\x00\x00IEND\xaeB`\x82'
 icon_id = idaapi.load_custom_icon(data=icon, format="png")
@@ -379,7 +377,7 @@ class VulFiScanner:
                 asgs = self.__get_var_assignments()
                 if asgs: # asgs will be empty with no hexrays
                     for asg in asgs:
-                        if self.__is_before_call(asg):
+                        if self.__is_before_call(asg.ea):
                             if self.string_value(asg.y) == "" and self.number_value(asg.y) == None:
                                 # One of the assigns is non-const
                                 return False
@@ -401,19 +399,33 @@ class VulFiScanner:
         def used_in_call_disass(self,function_list):
             return False
 
-        # Simple check whether the expression is before the call
-        # TODO no hexrays
-        # TODO test
-        def __is_before_call(self,expr):
-            if self.scanner_instance.hexrays:
-                decompiled_function = ida_hexrays.decompile(self.call_xref)
-                code = decompiled_function.pseudocode
-                for citem in decompiled_function.treeitems:
-                    if citem.to_specific_type == expr:
+        # Simple check whether the given EA is before the call
+        # TODO test a lot
+        def __is_before_call(self,ea):
+            func = idaapi.get_func(ea)
+            flow = idaapi.FlowChart(func)
+            call_block = None
+            asg_block = None
+            # Get block of the assignemnt and block of the call
+            for block in flow:
+                if ea >= block.start_ea and ea <= block.end_ea:
+                    asg_block = block
+                if self.call_xref >= block.start_ea and self.call_xref <= block.end_ea:
+                    call_block = block
+            # If they are in the same block and asg ea is smaller then call_xref ea return True
+            if call_block == asg_block:
+                if ea < self.call_xref:
+                    return True
+            else:
+                # Blocks are different
+                call_preds = list(call_block.preds())
+                while call_preds:
+                    current_pred = call_preds.pop(0)
+                    if current_pred.start_ea == asg_block.start_ea:
                         return True
-                    if citem.ea == self.call_xref:
-                        return False
+                    call_preds.extend(list(current_pred.preds()))
             return False
+
 
 
 
@@ -766,22 +778,23 @@ class VulFi_Single_Function(idaapi.action_handler_t):
     result_window_columns = [ list(column) for column in zip(result_window_columns_names,result_window_columns_sizes)]
     result_window_row = collections.namedtuple("VulFiResultRow",result_window_columns_names)
 
-    def __init__(self):
+    def __init__(self,function_ea):
         idaapi.action_handler_t.__init__(self)
+        self.function_ea = function_ea
 
     # Called when the button is clicked
     def activate(self, ctx):
         custom_rule = custom_rule_name = ""
-        if not idc.get_type(idc.here()) and (idaapi.get_func(idc.here()) and not idc.get_type(idaapi.get_func(idc.here()).start_ea)):
+        if not idc.get_type(self.function_ea) and (idaapi.get_func(self.function_ea) and not idc.get_type(idaapi.get_func(self.function_ea).start_ea)):
             # If the type of the function is not set notify the user
             answer = ida_kernwin.ask_buttons("Yes","No","Cancel",1,f"You should first set type for the function. Continue without type anyway?")
             if answer != 1:
                 return
   
         # Show the form
-        function_name = idc.get_func_name(idc.here())
+        function_name = idc.get_func_name(self.function_ea)
         if not function_name:
-            function_name = idc.get_name(idc.here())
+            function_name = idc.get_name(self.function_ea)
         f = vulfi_form_t(function_name)
         # Compile (in order to populate the controls)
         f.Compile()
@@ -1067,15 +1080,28 @@ class Hooks(idaapi.UI_Hooks):
 
 
     def finish_populating_widget_popup(self, form, popup):
+        action_text = f"Add '{utils.get_func_name(idc.here())}' function to VulFi"
+        function_ea = idc.here()
+        try:
+            # Get selected symbol
+            selected_symbol, _ = ida_kernwin.get_highlight(ida_kernwin.get_current_viewer())
+            # Check if it is a function name
+            for function in idautils.Functions():
+                if utils.get_func_name(function) in [selected_symbol, f".{selected_symbol}", f"_{selected_symbol}", f"{selected_symbol.replace('_','.')}"]:
+                    action_text = f"Add '{utils.get_func_name(function)}' function to VulFi"
+                    function_ea = function
+        except:
+            pass
         action_desc = idaapi.action_desc_t(
         'vulfi:get_one',   # The action name. This acts like an ID and must be unique
-        'Add current function to VulFi',  # The action text.
-        VulFi_Single_Function(),   # The action handler.
+        action_text,  # The action text.
+        VulFi_Single_Function(function_ea),   # The action handler.
         '',      # Optional: the action shortcut
         'Make VulFi look for all interesting refences of this function.',  # Optional: the action tooltip (available in menus/toolbar)
         icon_id)           # Optional: the action icon (shows when in menus/toolbars)
+        idaapi.unregister_action("vulfi:get_one")
         idaapi.register_action(action_desc)
-        if ida_kernwin.get_widget_type(form) == idaapi.BWN_DISASM:
+        if ida_kernwin.get_widget_type(form) == idaapi.BWN_DISASM or ida_kernwin.get_widget_type(form) == idaapi.BWN_PSEUDOCODE:
             idaapi.attach_action_to_popup(form, popup, "vulfi:get_one", "")
     
     def current_widget_changed(self, widget, prev_widget):
