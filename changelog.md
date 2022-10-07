@@ -6,12 +6,13 @@ You can now highlight and righ-click a function name to trace it in both disasse
 
 ## Improvements of existing features
 
-The VulFi now looks for constants that are passed through a variable (when for exmaple based on condition you execute different OS command through a call to `system` function, but in both cases this command is static). To achieve this a basic checks the flow of the code were added. See example below:
+The VulFi now looks for constants that are passed through a variable in decompiler (when for exmaple based on condition you execute different OS command through a call to `system` function, but in both cases this command is static). To achieve this a basic checks the flow of the code were added. See example below:
 
 ![basic](./img/better_const.gif)
 
 ## New features
 
+Added possibility to look for the use of the paramter in other function calls both before and after the traced call. This can be useful to for example find all occurances of `strcpy` where the value of the `src` argument was not checked with `strlen` call.
 
 ## Others
 
