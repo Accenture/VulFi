@@ -43,7 +43,7 @@ The plugin also allows for creating custom rules. These rules could be defined i
 
 #### Within the Interface
 
-When you would like to trace a custom function, which was identified during the analysis, just switch the IDA View to that function, right-click anywhere within its body and select `Add current function to VulFi`.
+When you would like to trace a custom function, which was identified during the analysis, right-click anywhere within its body and select `Add <name> function to VulFi`. You could also highlight and right-click a function name within current disassembly/decompiler view to avoid switching into the function body.
 
 ![add custom](./img/add_custom.gif)
 
@@ -102,6 +102,7 @@ An example rule that looks for all cross-references to function `malloc` and che
 * Get string value of parameter: `param[<index>].string_value()`
 * Is parameter set to null after the call: `param[<index>].set_to_null_after_call()`
 * Is return value of a function checked: `function_call.return_value_checked(<constant_to_check>)`
+* Is the parameter also used as a parameter in one of the calls to a specified list of functions before/after: `param[<index>].used_in_call_<before|after>(["function1","function2"])`
 
 #### Examples
 
@@ -113,6 +114,7 @@ An example rule that looks for all cross-references to function `malloc` and che
 * Mark all calls to a function where none of the parameters starting from the third are constants: `all(not p.is_constant() for p in param[2:])`
 * Mark all calls to a function where any of the parameters are constant: `any(p.is_constant() for p in param)`
 * Mark all calls to a function: `True`
+* Mark calls to a function where the second paramter is not constant and is not checked with `strlen`: `not param[1].is_constant() and not param[1].used_in_call_before(["strlen"])`
 
 ### Issues and Warnings
 
