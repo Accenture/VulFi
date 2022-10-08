@@ -10,12 +10,15 @@ The VulFi now looks for constants that are passed through a variable in decompil
 
 ![basic](./img/better_const.gif)
 
+TODO gifs are broken
+
 ## New features
 
-Added possibility to look for the use of the paramter in other function calls both before and after the traced call. This can be useful to for example find all occurances of `strcpy` where the value of the `src` argument was not checked with `strlen` call.
+* Added possibility to look for the use of the paramter in other function calls both before and after the traced call. This can be useful to for example find all occurances of `strcpy` where the value of the `src` argument was not checked with `strlen` call.
+* Added possibility to find whether the call to a function is reachable from other specific function. This is useful in situations where you know about certain input processing function and you want to find out whether any of the calls to `system` function is reachable from that location (does not use HexRays at all but requires IDA to properly resolve XREFs).
 
 ## Others
 
 Updated and new features were reflected in the default set of rules that ships within this repository. You can investigate all the changes here: TODO
 
-Performance improvment by caching decompilation results.
+Performance improvment by caching decompilation results where applicable.

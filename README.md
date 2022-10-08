@@ -103,6 +103,7 @@ An example rule that looks for all cross-references to function `malloc` and che
 * Is parameter set to null after the call: `param[<index>].set_to_null_after_call()`
 * Is return value of a function checked: `function_call.return_value_checked(<constant_to_check>)`
 * Is the parameter also used as a parameter in one of the calls to a specified list of functions before/after: `param[<index>].used_in_call_<before|after>(["function1","function2"])`
+* Is the call to the selected function reachable from a specific other function: `function_call.reachable_from("<function_name>")`
 
 #### Examples
 
@@ -114,7 +115,8 @@ An example rule that looks for all cross-references to function `malloc` and che
 * Mark all calls to a function where none of the parameters starting from the third are constants: `all(not p.is_constant() for p in param[2:])`
 * Mark all calls to a function where any of the parameters are constant: `any(p.is_constant() for p in param)`
 * Mark all calls to a function: `True`
-* Mark calls to a function where the second paramter is not constant and is not checked with `strlen`: `not param[1].is_constant() and not param[1].used_in_call_before(["strlen"])`
+* Mark all calls to a function where the second paramter is not constant and is not checked with `strlen`: `not param[1].is_constant() and not param[1].used_in_call_before(["strlen"])`
+* Mark all calls to a function which are reachable from `read` function: `function_call.reachable_from("read")`
 
 ### Issues and Warnings
 
