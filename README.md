@@ -55,7 +55,7 @@ It is also possible to load a custom file with set of multiple rules. To create 
 [   // An array of rules
     {
         "name": "RULE NAME", // The name of the rule
-        "alt_names":[
+        "function_names":[
             "function_name_to_look_for" // List of all function names that should be matched against the conditions defined in this rule
         ],
         "wrappers":true,    // Look for wrappers of the above functions as well (note that the wrapped function has to also match the rule)
@@ -73,7 +73,7 @@ An example rule that looks for all cross-references to function `malloc` and che
 ```json
 {
     "name": "Possible Null Pointer Dereference",
-    "alt_names":[
+    "function_names":[
         "malloc",
         "_malloc",
         ".malloc"

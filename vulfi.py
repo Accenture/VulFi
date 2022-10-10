@@ -117,7 +117,7 @@ class VulFiScanner:
         ida_kernwin.show_wait_box("VulFi scan running ... ")
         self.prepare_functions_list()
         for rule in self.rules:
-            xrefs_dict = self.find_xrefs_by_name(rule["alt_names"],rule["wrappers"])
+            xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
             for scanned_function in xrefs_dict:
             # For each function in the rules
                 skip_count = 0
@@ -209,9 +209,12 @@ class VulFiScanner:
             idaapi.enum_import_names(i, imports_callback)
 
     # Returns a list of all xrefs to the function with specified name
-    def find_xrefs_by_name(self,function_names,wrappers):
+    def find_xrefs_by_name(self,func_names,wrappers):
         xrefs_list = {}
         insn = ida_ua.insn_t()
+        function_names = []
+        for name in func_names:
+            function_names.extend(utils.prep_func_name(name))
 
         # Convert function names to expected format (demangle them if possible)
         function_names = list(map(utils.get_pretty_func_name, function_names))
@@ -893,7 +896,7 @@ class VulFi_Single_Function(idaapi.action_handler_t):
             ida_kernwin.warning("Both rule name and the rule have to be filled!")
             return
         # Craft a temporary rule here:
-        tmp_rule = [{"name":f"{custom_rule_name}","alt_names":[function_name.lower(),f".{function_name.lower()}"],"wrappers":False,"mark_if":{"High":custom_rule,"Medium":"False","Low":"False"}}]
+        tmp_rule = [{"name":f"{custom_rule_name}","function_names":[function_name.lower(),f".{function_name.lower()}"],"wrappers":False,"mark_if":{"High":custom_rule,"Medium":"False","Low":"False"}}]
         vulfi_scanner = VulFiScanner(tmp_rule)
         rows = []
         marked_addrs = []
