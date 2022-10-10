@@ -546,11 +546,12 @@ class VulFiScanner:
                 else:
                     # not a direct string
                     byte_value = idc.get_bytes(expr.obj_ea,self.scanner_instance.ptr_size)
-                    tmp_ea = int.from_bytes(byte_value,byteorder=self.scanner_instance.endian)
-                    string_val = idc.get_strlit_contents(tmp_ea)
-                    if string_val:
-                        # If this evaluates to string we have a constant
-                        return string_val.decode()
+                    if byte_value:
+                        tmp_ea = int.from_bytes(byte_value,byteorder=self.scanner_instance.endian)
+                        string_val = idc.get_strlit_contents(tmp_ea)
+                        if string_val:
+                            # If this evaluates to string we have a constant
+                            return string_val.decode()
             else: # No hexrays
                 if expr.type == 0x2:
                     # Reference

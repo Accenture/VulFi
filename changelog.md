@@ -20,5 +20,3 @@ TODO gifs are broken
 ## Others
 
 Updated and new features were reflected in the default set of rules that ships within this repository. You can investigate all the changes here: TODO
-
-Performance improvment by caching decompilation results where applicable.
