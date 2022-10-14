@@ -201,9 +201,9 @@
         ],
         "wrappers":false,
         "mark_if":{
-            "High":"not param[1].is_constant()",
+            "High":"not param[1].is_constant() and not param[1].used_in_call_after(['strlen'])",
             "Medium":"False",
-            "Low": "False"
+            "Low": "not param[1].is_constant()"
         }
     },
     {
@@ -278,8 +278,8 @@
         ],
         "wrappers":false,
         "mark_if":{
-            "High":"'%s' in param[1].string_value()",
-            "Medium":"False",
+            "High":"any([(not param[i+1].used_in_call_before(['strlen']) and not param[i+1].is_constant()) for i in range(len(param[1].string_value().split('%'))) if param[1].string_value().split('%')[i].startswith('s')])",
+            "Medium":"'%s' in param[1].string_value()",
             "Low": "True"
         }
     },
