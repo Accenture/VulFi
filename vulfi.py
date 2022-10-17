@@ -679,13 +679,16 @@ class VulFiScanner:
         
         def reachable_from(self,function_name):
             functions = [idaapi.get_func(self.call_xref)]
+            checked_xrefs = []
             while functions:
                 current_function = functions.pop(0)
                 if current_function:
                     if utils.get_func_name(current_function.start_ea) in utils.prep_func_name(function_name):
                         return True
                     for xref in idautils.XrefsTo(current_function.start_ea):
-                        functions.append(idaapi.get_func(xref.frm))
+                        if xref.frm not in checked_xrefs:
+                            functions.append(idaapi.get_func(xref.frm))
+                            checked_xrefs.append(xref.frm)
             return False
 
         # Check whether the return value of a function is part of some comparison (verification)
