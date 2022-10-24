@@ -1,4 +1,4 @@
-# VulFi v1.0
+# VulFi v2.0
 
 ## Introduction 
 
@@ -43,7 +43,7 @@ The plugin also allows for creating custom rules. These rules could be defined i
 
 #### Within the Interface
 
-When you would like to trace a custom function, which was identified during the analysis, just switch the IDA View to that function, right-click anywhere within its body and select `Add current function to VulFi`.
+When you would like to trace a custom function, which was identified during the analysis, right-click anywhere within its body and select `Add <name> function to VulFi`. You could also highlight and right-click a function name within current disassembly/decompiler view to avoid switching into the function body.
 
 ![add custom](./img/add_custom.gif)
 
@@ -55,7 +55,7 @@ It is also possible to load a custom file with set of multiple rules. To create 
 [   // An array of rules
     {
         "name": "RULE NAME", // The name of the rule
-        "alt_names":[
+        "function_names":[
             "function_name_to_look_for" // List of all function names that should be matched against the conditions defined in this rule
         ],
         "wrappers":true,    // Look for wrappers of the above functions as well (note that the wrapped function has to also match the rule)
@@ -73,7 +73,7 @@ An example rule that looks for all cross-references to function `malloc` and che
 ```json
 {
     "name": "Possible Null Pointer Dereference",
-    "alt_names":[
+    "function_names":[
         "malloc",
         "_malloc",
         ".malloc"
@@ -102,6 +102,8 @@ An example rule that looks for all cross-references to function `malloc` and che
 * Get string value of parameter: `param[<index>].string_value()`
 * Is parameter set to null after the call: `param[<index>].set_to_null_after_call()`
 * Is return value of a function checked: `function_call.return_value_checked(<constant_to_check>)`
+* Is the parameter also used as a parameter in one of the calls to a specified list of functions before/after: `param[<index>].used_in_call_<before|after>(["function1","function2"])`
+* Is the call to the selected function reachable from a specific other function: `function_call.reachable_from("<function_name>")`
 
 #### Examples
 
@@ -113,6 +115,8 @@ An example rule that looks for all cross-references to function `malloc` and che
 * Mark all calls to a function where none of the parameters starting from the third are constants: `all(not p.is_constant() for p in param[2:])`
 * Mark all calls to a function where any of the parameters are constant: `any(p.is_constant() for p in param)`
 * Mark all calls to a function: `True`
+* Mark all calls to a function where the second paramter is not constant and is not checked with `strlen`: `not param[1].is_constant() and not param[1].used_in_call_before(["strlen"])`
+* Mark all calls to a function which are reachable from `read` function: `function_call.reachable_from("read")`
 
 ### Issues and Warnings
 

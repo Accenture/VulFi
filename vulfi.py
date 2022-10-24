@@ -1,6 +1,8 @@
 from ast import expr_context
+from cmath import exp
 import collections
 from email.policy import default
+from uuid import RESERVED_FUTURE
 import idaapi
 import idc
 import ida_ua
@@ -10,12 +12,12 @@ import idautils
 import ida_kernwin
 import ida_name
 import ida_hexrays
+import ida_funcs
 import traceback
 
 
 icon = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00*\x00\x00\x00&\x08\x06\x00\x00\x00\xb2\x01\t \x00\x00\x00\x01sRGB\x00\xae\xce\x1c\xe9\x00\x00\x00\x04gAMA\x00\x00\xb1\x8f\x0b\xfca\x05\x00\x00\x00\tpHYs\x00\x00\x0e\xc3\x00\x00\x0e\xc3\x01\xc7o\xa8d\x00\x00\x02TIDATXG\xcd\x98\xcd.\x03Q\x14\xc7\xef\x10\x14-\xd5\xf8Jj!x\x00+,\xc5\x03\x88\x07\xb0\xb0\xb2\xea\x82\'\xc0\x13\x90\xb0\x15\x8f\x80x\x00+k\x89\xd8\x93\xb0\x94\xb0\x13A\xc6\xf9\xb7skz\xe7\xcc\xf4\xdc\xf9\xec/\xf9\xa5\x9d\x99\xce\xbdg\xce\xdc9\xf7N\x15\xb1@\x1e\x93\xf3\xd8\xe81\xaa\xe4\x91\xf7\xd9\xe4\x9etI\x04\xdc\x0b \xb0=\xf2\x89\xbc\xc0\x0e\r\xb2\x89@\xe1;\xb9C\x16\x05\xfaF\x80:\x9ee\xb2\x83KR\x1f\x84\xc8\xf2:\x99\x17\xe8K\xdfY\xed\x01\x19\xc0\x9fU\xbf\xb8\x80\xc0U\xa5\x08\xda\xbe%\xcd~qg\xdbc\xd3\x04\xe3\xc1<A\x9b\xf6\xf8E\x80h\x13\x01q\xfd\xb1\xd9\xd4\xe0\n\xb8\x93\xfcF6 \x00}D\x05\x081FC\xb3\xa9A#\xdc\xc9~1\x96l\x1f8I\x80Zq\xdb\xfe\xa7.J\x04\xbcEF\x81\x00\xf1\x1bI\x80\x10\xe3U\x0c\x1a\xe6\x1a\t\x13\x0f\x1c7apOr7\xad+\x8d4\xab~\xf10"`tf\x96;\x898\xc7\x1at\xc65\x96\x95\x18\x1a\xb1\xa7q\xae\xbeee\xa2\xf2\x97WV\x91\xcd\xae\xe5\xa8\x1b\x81\xb1\xd6glK\x1dp\x1c\xb7\x9fd\x8ea\x01\x92\x98\xc0\xd4\xeaxn\x0e\x97;\xf6G\xb9:Tj\x9e\xc3\x1c\x13\x15w)\x81\xa9\x15\x9d\xdeL\xd5\xdd\xdd\xf2x\xc7~\xceF\xa5\xea\x9e\xd5f\xc2\x02Mu\xa5\x86+\x0etrM\x81\xbe\xcd-\xb9\x1b\xa5\x91\xc01\xed\xf6\xe8\x98\xfbZ_tO\'\xa6\xb9\xe3\xa8\xb1"h\xb8\x89\xf8 OZ_\x83\x9c\xd7f\xd5\xda\xd0\xb0\xb7\xf5\xcf\xca`I\x1d\x8dO\xaa\x92C\xb9\xe4\xc1\xea]\x844P\xb0O>\xb7\xbe\xb6x\xfc\xfeRw_\x9f\xea\x81>\x1b\xe5\xaa\x1aq\xfe\x9bCp\x8d\xcaD\xfb7/\xbf?\xde\x916W\x9e\x99\x80\xf1\xc4\xdd\xc28ZO\x95\xb6\xc4\x99ZMcM\x95\xb6\xd8.XLQ\xdc\xb3|c\xe8 IV\x93.\xbc\xad\x88;\xb5&Zx\xc4%\xce\x82%\xd7lj0\xce\xb8`\xc2Lu\xaa\xb4%\xea\xad\xd5\xb4\x90lj\xd8\xa9\x95\x11Sea\xd9\xd4\x1c\x92\\p~3/\xee\x12\x90\xa9\xa8r\x95Kq\x97\x82\xf1\xc7\x05\ts+\xee\x12\xc2\xb2Z\xe8\x03\x14\x86\xb9`I\xe5=(+\xfcY\xed\xc9ljtV\x0b-\xeeR\xe2\xfc\x81V\x08\x19dR\xa9?"\x80\x16\n\xa6\x0c\x13@\x00\x00\x00\x00IEND\xaeB`\x82'
 icon_id = idaapi.load_custom_icon(data=icon, format="png")
-
 
 class utils:
     def get_negative_disass(op):
@@ -27,7 +29,7 @@ class utils:
         elif op.dtype == 0x2: # Dword
             return -(((op.value & 0xffffffff) ^ 0xffffffff) + 1)
         elif op.dtype == 0x7: # Qword
-            return -((op.value ^ 0xffffffffffffffff) + 1) 
+            return -((op.value ^ 0xffffffffffffffff) + 1)
 
     def get_func_name(ea):
         # Get pretty function name
@@ -42,6 +44,13 @@ class utils:
         # Cut arguments
         return demangled_name[:demangled_name.find("(")]
 
+    def prep_func_name(name):
+        if name[0] != "." and name[0] != "_":
+            # Name does not start with dot or underscore
+            return [name,f".{name}",f"_{name}"]
+        else:
+            return [name[1:],f".{name[1:]}",f"_{name[1:]}"]
+
 class null_after_visitor(ida_hexrays.ctree_visitor_t):
     def __init__(self,decompiled_function,call_xref,func_name,matched):
         self.found_call = False
@@ -51,12 +60,12 @@ class null_after_visitor(ida_hexrays.ctree_visitor_t):
         self.func_name = func_name
         self.insn_counter = 0
         self.matched = matched
-    
+
     def visit_insn(self, i):
         if self.found_call:
             self.insn_counter += 1
         return 0
-   
+
     def visit_expr(self, e):
         if e.op == ida_hexrays.cot_call:
             xref_func_name = utils.get_func_name(e.x.obj_ea)
@@ -100,7 +109,7 @@ class VulFiScanner:
             self.hexrays = False
             self.strings_list = idautils.Strings()
         else:
-            self.hexrays = True 
+            self.hexrays = True
             #self.strings_list = idautils.Strings()
 
     def start_scan(self,ignore_addr_list):
@@ -108,7 +117,7 @@ class VulFiScanner:
         ida_kernwin.show_wait_box("VulFi scan running ... ")
         self.prepare_functions_list()
         for rule in self.rules:
-            xrefs_dict = self.find_xrefs_by_name(rule["alt_names"],rule["wrappers"])
+            xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
             for scanned_function in xrefs_dict:
             # For each function in the rules
                 skip_count = 0
@@ -118,7 +127,7 @@ class VulFiScanner:
                     counter += 1
                     if ida_kernwin.user_cancelled():
                         print("[VulFi] Scan canceled!")
-                        ida_kernwin.hide_wait_box()  
+                        ida_kernwin.hide_wait_box()
                         return None
                     if skip_count > 0:
                         skip_count -= 1
@@ -162,7 +171,7 @@ class VulFiScanner:
                             priority = "Medium"
                         elif eval(rule["mark_if"]["Low"],dict(self=self, param=param,param_count=param_count,function_call=function_call)):
                             priority = "Low"
-                        
+
                     except IndexError:
                         # Decompiler output has fewer parameters than the function prototype
                         # Mark the issue with Info priority
@@ -179,8 +188,8 @@ class VulFiScanner:
                         skip_count = 0 # rule for the wrapped function matched so no need to skip calls to the wrapper
                     elif "wrapped" in scanned_function_display_name and priority == "":
                         # Rule for wrapped function did not match, skip the wrapper
-                        skip_count = int(scanned_function_display_name[scanned_function_display_name.find("wrapped:") + 8:-1])  
-        ida_kernwin.hide_wait_box()                      
+                        skip_count = int(scanned_function_display_name[scanned_function_display_name.find("wrapped:") + 8:-1])
+        ida_kernwin.hide_wait_box()
         return results
 
     def prepare_functions_list(self):
@@ -188,7 +197,7 @@ class VulFiScanner:
         # Gather all functions in all segments
         for segment in idautils.Segments():
             self.functions_list.extend(list(idautils.Functions(idc.get_segm_start(segment),idc.get_segm_end(segment))))
-        
+
         # Gather imports
         def imports_callback(ea, name, ordinal):
             self.functions_list.append(ea)
@@ -200,9 +209,12 @@ class VulFiScanner:
             idaapi.enum_import_names(i, imports_callback)
 
     # Returns a list of all xrefs to the function with specified name
-    def find_xrefs_by_name(self,function_names,wrappers):
+    def find_xrefs_by_name(self,func_names,wrappers):
         xrefs_list = {}
         insn = ida_ua.insn_t()
+        function_names = []
+        for name in func_names:
+            function_names.extend(utils.prep_func_name(name))
 
         # Convert function names to expected format (demangle them if possible)
         function_names = list(map(utils.get_pretty_func_name, function_names))
@@ -217,7 +229,7 @@ class VulFiScanner:
             if prototype is not None:
                 idc.SetType(function_address, prototype)
                 idaapi.auto_wait()
-            
+
 
             # Seach function "as is" and "ingnore case"
             if current_function_name not in function_names:
@@ -264,7 +276,7 @@ class VulFiScanner:
         else:
             # Hexrays not available, decompiler cannot be used
             return self.get_wrapper_xrefs_disass(xref)
-    
+
     def get_wrapper_xrefs_hexrays(self,function_xref,current_function_name):
         wrapper_xrefs = []
         try:
@@ -294,7 +306,7 @@ class VulFiScanner:
                                 if not lvars[current_obj.v.idx].is_arg_var:
                                     found = False
                             else:
-                                arg_objects.extend([current_obj.to_specific_type.x,current_obj.to_specific_type.y])                   
+                                arg_objects.extend([current_obj.to_specific_type.x,current_obj.to_specific_type.y])
                         # The function is likely a wrapper, get XREFs to it
                         if found:
                             for wrapper_xref in idautils.XrefsTo(decompiled_function.entry_ea):
@@ -368,39 +380,167 @@ class VulFiScanner:
             self.param = param
             self.call_xref = call_xref
             self.scanned_function = scanned_function
-        
+
         def is_constant(self):
             if self.string_value() == "" and self.number_value() == None:
+                asgs = self.__get_var_assignments()
+                if asgs: # asgs will be empty with no hexrays
+                    for asg in asgs:
+                        if self.__is_before_call(asg.ea):
+                            if self.string_value(asg.y) == "" and self.number_value(asg.y) == None:
+                                # One of the assigns is non-const
+                                return False
+                    return True
                 return False
             else:
                 return True
 
-        def string_value(self):
+        # Returns True if the param is used in any function call specified in the "function_list" parameter
+        def used_in_call_before(self,function_list):
+            if self.scanner_instance.hexrays:
+                return self.used_in_call_before_hexrays(function_list)
+            else:
+                return self.used_in_call_before_disass(function_list)
+
+        def used_in_call_before_hexrays(self,function_list):
+            # get all calls with the parameter
+            calls = self.__get_var_arg_calls()
+            # prep function list
+            tmp_fun_list = []
+            for fun in function_list:
+                tmp_fun_list.extend(utils.prep_func_name(fun))
+            for call in calls:
+                if utils.get_func_name(call.x.obj_ea) in tmp_fun_list and self.__is_before_call(call.ea):
+                    return True
+            return False
+
+        def used_in_call_before_disass(self,function_list):
+            return False
+
+        def used_in_call_after(self,function_list):
+            if self.scanner_instance.hexrays:
+                return self.used_in_call_after_hexrays(function_list)
+            else:
+                return self.used_in_call_after_disass(function_list)
+
+        def used_in_call_after_hexrays(self,function_list):
+            # get all calls with the parameter
+            calls = self.__get_var_arg_calls()
+            # prep function list
+            tmp_fun_list = []
+            for fun in function_list:
+                tmp_fun_list.extend(utils.prep_func_name(fun))
+            for call in calls:
+                if utils.get_func_name(call.x.obj_ea) in tmp_fun_list and not self.__is_before_call(call.ea):
+                    return True
+            return False
+
+        def used_in_call_after_disass(self,function_list):
+            return False
+
+        # Simple check whether the given EA is before the call
+        def __is_before_call(self,ea):
+            func = idaapi.get_func(ea)
+            flow = idaapi.FlowChart(func)
+            call_block = None
+            asg_block = None
+            checked_blocks = []
+            # Get block of the assignemnt and block of the call
+            for block in flow:
+                if ea >= block.start_ea and ea <= block.end_ea:
+                    asg_block = block
+                if self.call_xref >= block.start_ea and self.call_xref <= block.end_ea:
+                    call_block = block
+                    checked_blocks.append(block.start_ea)
+            # If they are in the same block and asg ea is smaller then call_xref ea return True
+            if call_block == asg_block:
+                if ea < self.call_xref:
+                    return True
+            else:
+                # Blocks are different
+                call_preds = list(call_block.preds())
+                while call_preds:
+                    current_pred = call_preds.pop(0)
+                    # Prevent endless loops
+                    if current_pred.start_ea in checked_blocks:
+                        continue
+                    checked_blocks.append(current_pred.start_ea)
+                    # Check if we matched the given assign block
+                    if current_pred.start_ea == asg_block.start_ea:
+                        return True
+                    call_preds.extend(list(current_pred.preds()))
+            return False
+
+        def __get_var_arg_calls(self):
+            calls = []
+            # Parameter is cast, get x
+            if self.param.op == ida_hexrays.cot_cast:
+                param = self.param.x
+            else:
+                param = self.param
+            decompiled_function = ida_hexrays.decompile(self.call_xref)
+            code = decompiled_function.pseudocode
+            for citem in decompiled_function.treeitems:
+                if citem.op == ida_hexrays.cot_call and citem.ea != self.call_xref: # skip calls we are tracing
+                    # Potentially interesting call
+                    for a in citem.to_specific_type.a:
+                        expressions = [a,a.x,a.y,a.z]
+                        while expressions:
+                            current_expr = expressions.pop(0)
+                            if current_expr:
+                                if param == current_expr:
+                                    # Call operation, add to array
+                                    calls.append(citem.to_specific_type)
+                                    break # we can break the loop as the variable was found within the arguments
+                                expressions.extend([current_expr.x, current_expr.y, current_expr.z])
+            return calls
+
+        # Returns list of assign expressions for better accuracy
+        def __get_var_assignments(self):
+            asg = []
+            # Parameter is cast, get x
+            if self.param.op == ida_hexrays.cot_cast:
+                param = self.param.x
+            else:
+                param = self.param
+            decompiled_function = ida_hexrays.decompile(self.call_xref)
+            code = decompiled_function.pseudocode
+            for citem in decompiled_function.treeitems:
+                if param == citem.to_specific_type:
+                    parent = decompiled_function.body.find_parent_of(citem)
+                    if parent.op >= ida_hexrays.cot_asg and parent.op <= ida_hexrays.cot_asgumod:
+                        # Assign operation, add to array
+                        asg.append(parent.to_specific_type)
+            return asg
+
+        def string_value(self,expr=None):
+            if not expr:
+                expr = self.param
             if self.scanner_instance.hexrays: # hexrays
-                string_val = idc.get_strlit_contents(self.param.obj_ea)
+                string_val = idc.get_strlit_contents(expr.obj_ea)
                 if string_val:
                     return string_val.decode()
                 # If it is a cast (could happen)
-                elif self.param.op == ida_hexrays.cot_cast:
+                elif expr.op == ida_hexrays.cot_cast:
                     # If casted op is object
-                    if self.param.x.op == ida_hexrays.cot_obj:
+                    if expr.x.op == ida_hexrays.cot_obj:
                         # If that object points to a string
-                        string_val = idc.get_strlit_contents(self.param.x.obj_ea)
+                        string_val = idc.get_strlit_contents(expr.x.obj_ea)
                         if string_val:
                             return string_val.decode()
-                elif self.param.op == ida_hexrays.cot_ref:
-                    string_val = idc.get_strlit_contents(self.param.x.obj_ea)
+                elif expr.op == ida_hexrays.cot_ref:
+                    string_val = idc.get_strlit_contents(expr.x.obj_ea)
                     if string_val:
                         return string_val.decode()
-                    if self.param.x.op == ida_hexrays.cot_idx:
-                        string_val = idc.get_strlit_contents(self.param.x.x.obj_ea)
+                    if expr.x.op == ida_hexrays.cot_idx:
+                        string_val = idc.get_strlit_contents(expr.x.x.obj_ea)
                         if string_val:
                             return string_val.decode()
                     # Check whether we are looking at CFString
-                    if self.param.x.obj_ea != idc.BADADDR:
-                        c_str_pointer_value = idc.get_bytes(self.param.x.obj_ea +  2* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size)
+                    if expr.x.obj_ea != idc.BADADDR:
+                        c_str_pointer_value = idc.get_bytes(expr.x.obj_ea +  2* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size)
                         tmp_ea = int.from_bytes(c_str_pointer_value,byteorder=self.scanner_instance.endian)
-                        c_str_len = int.from_bytes(idc.get_bytes(self.param.x.obj_ea +  3* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
+                        c_str_len = int.from_bytes(idc.get_bytes(expr.x.obj_ea +  3* self.scanner_instance.ptr_size, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
                         c_string_value = idc.get_strlit_contents(tmp_ea)
                         # Having a string at this position and its length following the pointer suggests CFString struct
                         if c_string_value and len(c_string_value) == c_str_len:
@@ -408,26 +548,27 @@ class VulFiScanner:
                             return c_string_value.decode()
                 else:
                     # not a direct string
-                    byte_value = idc.get_bytes(self.param.obj_ea,self.scanner_instance.ptr_size)
-                    tmp_ea = int.from_bytes(byte_value,byteorder=self.scanner_instance.endian)
-                    string_val = idc.get_strlit_contents(tmp_ea)
-                    if string_val:
-                        # If this evaluates to string we have a constant
-                        return string_val.decode()
+                    byte_value = idc.get_bytes(expr.obj_ea,self.scanner_instance.ptr_size)
+                    if byte_value:
+                        tmp_ea = int.from_bytes(byte_value,byteorder=self.scanner_instance.endian)
+                        string_val = idc.get_strlit_contents(tmp_ea)
+                        if string_val:
+                            # If this evaluates to string we have a constant
+                            return string_val.decode()
             else: # No hexrays
-                if self.param.type == 0x2:
+                if expr.type == 0x2:
                     # Reference
-                    if idc.get_strlit_contents(self.param.addr):
-                        return idc.get_strlit_contents(self.param.addr).decode()
+                    if idc.get_strlit_contents(expr.addr):
+                        return idc.get_strlit_contents(expr.addr).decode()
                     else:
                         # Reference to reference
-                        addr = int.from_bytes(idc.get_bytes(self.param.addr, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
+                        addr = int.from_bytes(idc.get_bytes(expr.addr, self.scanner_instance.ptr_size),byteorder=self.scanner_instance.endian)
                         if idc.get_strlit_contents(addr):
                             return idc.get_strlit_contents(addr).decode()
 
-                if self.param.type == 0x5:
-                    if idc.get_strlit_contents(self.param.value):
-                        return idc.get_strlit_contents(self.param.value).decode()
+                if expr.type == 0x5:
+                    if idc.get_strlit_contents(expr.value):
+                        return idc.get_strlit_contents(expr.value).decode()
                 # Reverse appoach of going from strings to calls
                 for c_string in self.scanner_instance.strings_list:
                     for str_xref in idautils.XrefsTo(c_string.ea):
@@ -450,36 +591,40 @@ class VulFiScanner:
                                         # If we survived the loop it is True
                                         return str(c_string)
             return ""
-        
-        def number_value(self):
+
+        def number_value(self,expr=None):
+            if not expr:
+                expr = self.param
             if self.scanner_instance.hexrays: # hexrays
                 # If it is number directly
-                if self.param.op == ida_hexrays.cot_num:
-                    return self.param.n._value
+                if expr.op == ida_hexrays.cot_num:
+                    return expr.n._value
                 # if it is a float
-                elif self.param.op == ida_hexrays.cot_fnum:
-                    return self.param.fpc.fnum.float
+                elif expr.op == ida_hexrays.cot_fnum:
+                    return expr.fpc.fnum.float
                 # If it is a cast
-                elif self.param.op == ida_hexrays.cot_cast:
-                    if self.param.x.op == ida_hexrays.cot_num:
-                        return self.param.x.n._value
-                    elif self.param.x.op == ida_hexrays.cot_fnum:
-                        return self.param.x.fpc.fnum.float
+                elif expr.op == ida_hexrays.cot_cast:
+                    if expr.x.op == ida_hexrays.cot_num:
+                        return expr.x.n._value
+                    elif expr.x.op == ida_hexrays.cot_fnum:
+                        return expr.x.fpc.fnum.float
             else: # No hexrays
                 # self.param is op_t
                 # 0x5 is immediate
-                if self.param.type == 0x5:
-                    return self.param.value
+                if expr.type == 0x5:
+                    return expr.value
             return None
 
-        def is_const_number(self):
+        def is_const_number(self,expr=None):
+            if not expr:
+                expr = self.param
             if self.scanner_instance.hexrays:
-                if self.param.op == ida_hexrays.cot_num or self.param.op == ida_hexrays.cot_fnum:
+                if expr.op == ida_hexrays.cot_num or expr.op == ida_hexrays.cot_fnum:
                     return True
-                elif self.param.op == ida_hexrays.cot_cast and self.param.x.op == ida_hexrays.cot_num:
+                elif expr.op == ida_hexrays.cot_cast and expr.x.op == ida_hexrays.cot_num:
                     return True
             else:
-                if self.param.type == 0x5:
+                if expr.type == 0x5:
                     return True
             return False
 
@@ -499,7 +644,7 @@ class VulFiScanner:
             following_insn = ida_ua.insn_t()
             # First get the call instruction
             if ida_ua.decode_insn(call_insn,self.call_xref) != idc.BADADDR:
-                # Now use the call instruction to get EA of next insn 
+                # Now use the call instruction to get EA of next insn
                 if ida_ua.decode_insn(following_insn,call_insn.ea + call_insn.size) != idc.BADADDR:
                     # following_insn can be used to evaluate whether Op2 is a constant or not
                     if following_insn.Op2.type == 0x5 and following_insn.Op2.value == 0x0:
@@ -514,22 +659,37 @@ class VulFiScanner:
             try:
                 decompiled_function = ida_hexrays.decompile(self.call_xref)
             except:
-                return matched["set_to_null"] 
+                return matched["set_to_null"]
             if decompiled_function is None:
                 # Decompilation failed
                 return None
             custom_visitor = null_after_visitor(decompiled_function,self.call_xref,self.scanned_function,matched)
             custom_visitor.apply_to(decompiled_function.body, None)
-            
-            return matched["set_to_null"] 
 
-        
-        
+            return matched["set_to_null"]
+
+
+
     class FunctionCall:
         def __init__(self,scanner,call_xref,scanned_function):
             self.scanner_instance = scanner
             self.call_xref = call_xref
             self.scanned_function = scanned_function
+
+        
+        def reachable_from(self,function_name):
+            functions = [idaapi.get_func(self.call_xref)]
+            checked_xrefs = []
+            while functions:
+                current_function = functions.pop(0)
+                if current_function:
+                    if utils.get_func_name(current_function.start_ea) in utils.prep_func_name(function_name):
+                        return True
+                    for xref in idautils.XrefsTo(current_function.start_ea):
+                        if xref.frm not in checked_xrefs:
+                            functions.append(idaapi.get_func(xref.frm))
+                            checked_xrefs.append(xref.frm)
+            return False
 
         # Check whether the return value of a function is part of some comparison (verification)
         def return_value_checked(self,check_val = None):
@@ -550,7 +710,7 @@ class VulFiScanner:
                     current_insn = ida_ua.insn_t()
                     if ida_ua.decode_insn(current_insn,self.call_xref) != idc.BADADDR:
                         while insn_counter < 5:
-                            following_insn = ida_ua.insn_t() 
+                            following_insn = ida_ua.insn_t()
                             if ida_ua.decode_insn(following_insn,current_insn.ea + current_insn.size) != idc.BADADDR:
                                 current_insn = following_insn
                                 # Most of the compare instructions
@@ -564,15 +724,15 @@ class VulFiScanner:
                                                 else:
                                                     return False
                                     else:
-                                        # Likely comparison instruction hit  
+                                        # Likely comparison instruction hit
                                         return True
                                 insn_counter += 1
                             else:
                                 break
                             # Jumped out of the block within 5 instructions
                             if current_insn.ea >= basic_block.end_ea:
-                                return True        
-            return False      
+                                return True
+            return False
 
         def return_value_checked_hexrays(self,check_val):
             try:
@@ -664,7 +824,7 @@ class VulFiScanner:
                                         else:
                                             return True
 
-                            
+
                 index += 1
             return False
 
@@ -694,7 +854,7 @@ Custom Rule:
         })
 
     def OnFormChange(self, fid):
-        return 1        
+        return 1
 
 class VulFi_Single_Function(idaapi.action_handler_t):
     result_window_title = "VulFi Results"
@@ -703,22 +863,23 @@ class VulFi_Single_Function(idaapi.action_handler_t):
     result_window_columns = [ list(column) for column in zip(result_window_columns_names,result_window_columns_sizes)]
     result_window_row = collections.namedtuple("VulFiResultRow",result_window_columns_names)
 
-    def __init__(self):
+    def __init__(self,function_ea):
         idaapi.action_handler_t.__init__(self)
+        self.function_ea = function_ea
 
     # Called when the button is clicked
     def activate(self, ctx):
         custom_rule = custom_rule_name = ""
-        if not idc.get_type(idc.here()) and (idaapi.get_func(idc.here()) and not idc.get_type(idaapi.get_func(idc.here()).start_ea)):
+        if not idc.get_type(self.function_ea) and (idaapi.get_func(self.function_ea) and not idc.get_type(idaapi.get_func(self.function_ea).start_ea)):
             # If the type of the function is not set notify the user
             answer = ida_kernwin.ask_buttons("Yes","No","Cancel",1,f"You should first set type for the function. Continue without type anyway?")
             if answer != 1:
                 return
-  
+
         # Show the form
-        function_name = idc.get_func_name(idc.here())
+        function_name = idc.get_func_name(self.function_ea)
         if not function_name:
-            function_name = idc.get_name(idc.here())
+            function_name = idc.get_name(self.function_ea)
         f = vulfi_form_t(function_name)
         # Compile (in order to populate the controls)
         f.Compile()
@@ -738,7 +899,7 @@ class VulFi_Single_Function(idaapi.action_handler_t):
             ida_kernwin.warning("Both rule name and the rule have to be filled!")
             return
         # Craft a temporary rule here:
-        tmp_rule = [{"name":f"{custom_rule_name}","alt_names":[function_name.lower(),f".{function_name.lower()}"],"wrappers":False,"mark_if":{"High":custom_rule,"Medium":"False","Low":"False"}}]
+        tmp_rule = [{"name":f"{custom_rule_name}","function_names":[function_name.lower(),f".{function_name.lower()}"],"wrappers":False,"mark_if":{"High":custom_rule,"Medium":"False","Low":"False"}}]
         vulfi_scanner = VulFiScanner(tmp_rule)
         rows = []
         marked_addrs = []
@@ -753,7 +914,7 @@ class VulFi_Single_Function(idaapi.action_handler_t):
         for item in vulfi_data:
             rows.append([vulfi_data[item]["name"],vulfi_data[item]["function"],vulfi_data[item]["in"],vulfi_data[item]["addr"],vulfi_data[item]["status"],vulfi_data[item]["priority"],vulfi_data[item]["comment"]])
             marked_addrs.append(vulfi_data[item]["addr"])
-        
+
         # Run the scan for selected function
         print("[VulFi] Started the scan ...")
         scan_result = vulfi_scanner.start_scan(marked_addrs)
@@ -763,7 +924,7 @@ class VulFi_Single_Function(idaapi.action_handler_t):
         print("[VulFi] Scan done!")
         # Save the results
         for item in rows:
-            vulfi_data[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]} 
+            vulfi_data[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]}
         node.setblob(json.dumps(vulfi_data).encode("ascii"),1,"S")
         # Construct and show the form
         results_window = VulFiEmbeddedChooser(self.result_window_title,self.result_window_columns,rows,icon_id)
@@ -775,7 +936,7 @@ class VulFi_Single_Function(idaapi.action_handler_t):
         results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
-    
+
     # This action is always available.
     def update(self, ctx):
         return idaapi.AST_ENABLE_ALWAYS
@@ -808,7 +969,7 @@ Custom VulFi rule
                 self.EnableField(self.iFileOpen, False)
             else:
                 self.EnableField(self.iFileOpen, True)
-        return 1 
+        return 1
 
 class VulFi(idaapi.action_handler_t):
     result_window_title = "VulFi Results"
@@ -865,7 +1026,7 @@ class VulFi(idaapi.action_handler_t):
                         return
             else:
                 return
-            
+
             for item in vulfi_data:
                 rows.append([vulfi_data[item]["name"],vulfi_data[item]["function"],vulfi_data[item]["in"],vulfi_data[item]["addr"],vulfi_data[item]["status"],vulfi_data[item]["priority"],vulfi_data[item]["comment"]])
                 marked_addrs.append(f'{vulfi_data[item]["name"]}_{vulfi_data[item]["addr"]}')
@@ -878,7 +1039,7 @@ class VulFi(idaapi.action_handler_t):
             print("[VulFi] Scan done!")
             # Save the results
             for item in rows:
-                vulfi_data[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]} 
+                vulfi_data[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]}
             node.setblob(json.dumps(vulfi_data).encode("ascii"),1,"S")
 
         # Construct and show the form
@@ -891,12 +1052,12 @@ class VulFi(idaapi.action_handler_t):
         results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
-        
-    
+
+
     # This action is always available.
     def update(self, ctx):
         return idaapi.AST_ENABLE_ALWAYS
-    
+
 
 class VulFiEmbeddedChooser(ida_kernwin.Choose):
     def __init__(self,title,columns,items,icon,embedded=False):
@@ -923,7 +1084,7 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         # On close dumps the results
         vulfi_dict = {}
         for item in self.items:
-            vulfi_dict[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]} 
+            vulfi_dict[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]}
         node = idaapi.netnode()
         node.create("vulfi_data")
         # Set the blob
@@ -976,7 +1137,7 @@ class vulfi_fetch_t(idaapi.plugin_t):
     wanted_name = "VulFi"
     wanted_hotkey = ""
     flags = idaapi.PLUGIN_KEEP
-    
+
 
     def init(self):
         vulfi_desc = idaapi.action_desc_t(
@@ -1004,22 +1165,35 @@ class Hooks(idaapi.UI_Hooks):
 
 
     def finish_populating_widget_popup(self, form, popup):
+        action_text = f"Add '{utils.get_func_name(idc.here())}' function to VulFi"
+        function_ea = idc.here()
+        try:
+            # Get selected symbol
+            selected_symbol, _ = ida_kernwin.get_highlight(ida_kernwin.get_current_viewer())
+            # Check if it is a function name
+            for function in idautils.Functions():
+                if utils.get_func_name(function) in utils.prep_func_name(selected_symbol):
+                    action_text = f"Add '{utils.get_func_name(function)}' function to VulFi"
+                    function_ea = function
+        except:
+            pass
         action_desc = idaapi.action_desc_t(
         'vulfi:get_one',   # The action name. This acts like an ID and must be unique
-        'Add current function to VulFi',  # The action text.
-        VulFi_Single_Function(),   # The action handler.
+        action_text,  # The action text.
+        VulFi_Single_Function(function_ea),   # The action handler.
         '',      # Optional: the action shortcut
         'Make VulFi look for all interesting refences of this function.',  # Optional: the action tooltip (available in menus/toolbar)
         icon_id)           # Optional: the action icon (shows when in menus/toolbars)
+        idaapi.unregister_action("vulfi:get_one")
         idaapi.register_action(action_desc)
-        if ida_kernwin.get_widget_type(form) == idaapi.BWN_DISASM:
+        if ida_kernwin.get_widget_type(form) == idaapi.BWN_DISASM or ida_kernwin.get_widget_type(form) == idaapi.BWN_PSEUDOCODE:
             idaapi.attach_action_to_popup(form, popup, "vulfi:get_one", "")
-    
+
     def current_widget_changed(self, widget, prev_widget):
         title = ida_kernwin.get_widget_title(widget)
         if title and "VulFi" in title and self.chooser:
             self.chooser.Refresh()
-    
+
     def set_chooser(self,chooser):
         self.chooser = chooser
 
