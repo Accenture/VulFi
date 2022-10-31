@@ -316,6 +316,7 @@
     ".vsprintf_l":"int vsprintf_l(char* buffer, char* format, void* locale, va_list argptr);",
     "_vsprintf_l":"int vsprintf_l(char* buffer, char* format, void* locale, va_list argptr);",
     "vsprintf_l":"int vsprintf_l(char* buffer, char* format, void* locale, va_list argptr);",
+    "vsprintf_like":"int vsprintf_like(char* buffer, char* format, va_list argptr);",
     ".vsprintf_p":"int _vsprintf_p(char *buffer, int sizeInBytes, char* format, va_list argptr);",
     "_vsprintf_p":"int _vsprintf_p(char *buffer, int sizeInBytes, char* format, va_list argptr);",
     "vsprintf_p":"int _vsprintf_p(char *buffer, int sizeInBytes, char* format, va_list argptr);",
