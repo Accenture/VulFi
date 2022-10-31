@@ -81,6 +81,7 @@
             "vfscanf_s",
             "vfwscanf_s",
             "vsprintf_l",
+            "vsprintf_like",
             "vswprintf",
             "vsprintf_s",
             "vswprintf_s",
@@ -274,7 +275,8 @@
             "fscanf",
             "sscanf",
             "sprintf",
-            "vsprintf"
+            "vsprintf",
+            "vsprintf_like"
         ],
         "wrappers":false,
         "mark_if":{
