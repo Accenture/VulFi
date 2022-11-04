@@ -935,6 +935,7 @@ class VulFi_Single_Function(idaapi.action_handler_t):
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Remove Item", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
 
@@ -1051,6 +1052,7 @@ class VulFi(idaapi.action_handler_t):
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Remove Item", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
 
@@ -1058,6 +1060,31 @@ class VulFi(idaapi.action_handler_t):
     # This action is always available.
     def update(self, ctx):
         return idaapi.AST_ENABLE_ALWAYS
+
+class vulfi_export_form_t(ida_kernwin.Form):
+
+    def __init__(self):
+        F = ida_kernwin.Form
+        F.__init__(
+            self,
+            r"""STARTITEM {id:rJSON}
+BUTTON YES* Save
+BUTTON CANCEL Cancel
+Custom VulFi rule
+
+{FormChangeCb}
+<##Choose format for export##JSON:{rJSON}>
+<CSV:{rCSV}>{cType}>
+<#Select the output file#Select the output file:{iFileOpen}>
+
+""", {
+            'iFileOpen': F.FileInput(save=True),
+            'cType': F.RadGroupControl(("rJSON", "rCSV")),
+            'FormChangeCb': F.FormChangeCb(self.OnFormChange)
+        })
+
+    def OnFormChange(self,fid):
+        return 1
 
 
 class VulFiEmbeddedChooser(ida_kernwin.Choose):
@@ -1116,6 +1143,44 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
             # Purge all
             if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete all VulFi results?") == 1:
                 self.items = []
+        if cmd_id == 6:
+            # Export
+            # Show the form
+            f = vulfi_export_form_t()
+            # Compile (in order to populate the controls)
+            f.Compile()
+            # Execute the form
+            ok = f.Execute()
+            # If the form was confirmed
+            if ok == 1:
+                # Get file name
+                file_name = f.iFileOpen.value
+                if file_name:
+                    if f.cType.value == 0:
+                        # JSON
+                        # Pretify 
+                        tmp_json = {"issues":[]}
+                        for item in self.items:
+                            tmp_json["issues"].append({
+                                "IssueName": item[0],
+                                "FunctionName": item[1],
+                                "FoundIn": item[2],
+                                "Address": item[3],
+                                "Status": item[4],
+                                "Priority": item[5],
+                                "Comment": item[6]
+                            })
+                        with open(file_name,"w") as out_file:
+                            json.dump(tmp_json, out_file)
+                        ida_kernwin.info(f"Results exported in JSON format to {file_name}")
+                    else:
+                        #CSV
+                        csv_string = "IssueName,FunctionName,FoundIn,Address,Status,Priority,Comment\n"
+                        for item in self.items:
+                            csv_string += f"{item[0]},{item[1]},{item[2]},{item[3]},{item[4]},{item[5]},{item[6]}\n"
+                        with open(file_name,"w") as out_file:
+                            out_file.write(csv_string)
+                        ida_kernwin.info(f"Results exported in comma-separated CSV file to {file_name}")
         self.Refresh()
         # Save the data after every change
         self.save()
