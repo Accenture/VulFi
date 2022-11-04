@@ -933,7 +933,7 @@ class VulFi_Single_Function(idaapi.action_handler_t):
         results_window.AddCommand("Mark as Suspicious", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Mark as Vulnerable", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Remove Item", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Remove Item(s)", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
@@ -1050,7 +1050,7 @@ class VulFi(idaapi.action_handler_t):
         results_window.AddCommand("Mark as Suspicious", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Mark as Vulnerable", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Remove Item", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Remove Item(s)", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
@@ -1089,9 +1089,12 @@ Custom VulFi rule
 
 class VulFiEmbeddedChooser(ida_kernwin.Choose):
     def __init__(self,title,columns,items,icon,embedded=False):
-        ida_kernwin.Choose.__init__(self,title,columns,embedded=embedded,width=100)
+        ida_kernwin.Choose.__init__(self,title,columns,embedded=embedded,width=100,flags=ida_kernwin.Choose.CH_MULTI)
         self.items = items
         self.icon = icon
+        self.multi_selection = []
+        self.delete = False
+        self.comment = False
 
     def GetItems(self):
         return self.items
@@ -1107,6 +1110,23 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         for item in self.items:
             item[2] = utils.get_func_name(int(item[3],16))
         ida_kernwin.Choose.Refresh(self)
+
+    def OnRefresh(self,n):
+        if self.delete:
+            for i in reversed(n):
+                self.items.pop(i)
+            self.delete = False
+            self.save()
+        if self.comment:
+            if len(n) == 1:
+                comment = ida_kernwin.ask_str(self.items[n[0]][6],1,f"Enter the comment: ")
+            else:
+                comment = ida_kernwin.ask_str("",1,f"Enter the comment: ")
+            for i in n:
+                self.items[i][6] = comment
+            self.comment = False
+            self.save()
+        return n
 
     def save(self):
         # On close dumps the results
@@ -1131,14 +1151,15 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
             self.items[number][4] = status
         if cmd_id == 3:
             # Comment
-            comment = ida_kernwin.ask_str(self.items[number][6],1,f"Enter the comment: ")
+            self.comment = True
+            '''comment = ida_kernwin.ask_str(self.items[number][6],1,f"Enter the comment: ")
             if comment == None:
                 return
-            self.items[number][6] = comment
+            self.items[number][6] = comment'''
         if cmd_id == 4:
-            # Delete one item
-            if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete item {self.items[number][0]} - {self.items[number][1]} found at address {self.items[number][3]}?") == 1:
-                self.items.pop(number)
+            # Delete selected items
+            #if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete selected item(s)?") == 1:
+            self.delete = True
         if cmd_id == 5:
             # Purge all
             if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete all VulFi results?") == 1:
@@ -1189,7 +1210,8 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         return len(self.items)
 
     def OnSelectLine(self,number):
-        row = VulFi.result_window_row(*self.items[number])
+        # By default change to first selected line
+        row = VulFi.result_window_row(*self.items[number[0]])
         destination = row.Address
         ida_kernwin.jumpto(int(destination,16))
 
