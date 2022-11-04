@@ -182,7 +182,7 @@ class VulFiScanner:
                         ida_kernwin.warning(f"The rule \"{rule}\" is not valid!")
                         continue
                     # If the rule matched and is not wrapped:
-                    if priority and not "wrapped" in scanned_function_display_name:
+                    if priority and found_in_name and not "wrapped" in scanned_function_display_name:
                         results.append(list(VulFi.result_window_row(rule["name"],scanned_function_display_name,found_in_name,hex(scanned_function_xref),"Not Checked",priority,"")))
                     elif "wrapped" in scanned_function_display_name and priority:
                         skip_count = 0 # rule for the wrapped function matched so no need to skip calls to the wrapper
