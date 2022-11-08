@@ -1,4 +1,4 @@
-# VulFi v2.0
+# VulFi v2.1
 
 ## Introduction 
 
@@ -31,7 +31,8 @@ In case that there are no data inside the `idb`/`i64` file or user decides to pe
 
 ![basic](./img/basic_use.gif)
 
-In the right-click context menu within the VulFi view, you can also remove the item from the results or remove all items. Please note that any comments or status updates will be lost after performing this operation.
+In the right-click context menu within the VulFi view, you can also remove the item from the results or remove all items. Please note that any comments or status updates will be lost after performing this operation. 
+As of version 2.1, VulFi also supports operations performed on multiple selected items at once. This allows multiple items to be marked with certain status, deleted or same comment added to multiple rows. Sometimes it happens that the operation does not refreshe correctly. When this occurs, refresh the UI (`Ctrl+U`) couple times until you see the changes reflected.
 
 ### Investigation
 
@@ -123,3 +124,4 @@ An example rule that looks for all cross-references to function `malloc` and che
 * When you request the parameter with index that is out of bounds any call to a function will be marked as `Low` priority. This is a way to avoid missing cross references where it was not possible to correctly get all parameters (this mainly applies to disassembly mode).
 * When you search within the VulFi view and change context out of the view and come back, the view will not load. You can solve this either by terminating the search operation before switching the context, moving the VulFi view to the side-view so that it is always visible or by closing and re-opening the view (no data will be lost).
 * Scans for more exotic architectures end with a lot of false positives.
+* With addition of multi-select operations in the VulFi chooser, the refresh operations sometimes fails to update the view. If you notice that your changes were not reflected, use `Ctrl+U` shortcut ot manually refresh the view (couple times).

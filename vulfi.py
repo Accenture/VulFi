@@ -117,7 +117,11 @@ class VulFiScanner:
         ida_kernwin.show_wait_box("VulFi scan running ... ")
         self.prepare_functions_list()
         for rule in self.rules:
-            xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
+            try:
+                xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
+            except:
+                ida_kernwin.warning("This does not seem like a correct rule file. Aborting scan.")
+                return
             for scanned_function in xrefs_dict:
             # For each function in the rules
                 skip_count = 0
@@ -956,12 +960,13 @@ Custom VulFi rule
 
 {FormChangeCb}
 <##What rule set to use?##Default rules:{rDefault}>
-<Custom rules:{rCustom}>{cType}>
+<Custom rules:{rCustom}>
+<Import previous results (JSON):{rImport}>{cType}>
 <#Select a file to open#Browse to open:{iFileOpen}>
 
 """, {
             'iFileOpen': F.FileInput(open=True),
-            'cType': F.RadGroupControl(("rDefault", "rCustom")),
+            'cType': F.RadGroupControl(("rDefault", "rCustom","rImport")),
             'FormChangeCb': F.FormChangeCb(self.OnFormChange)
         })
 
@@ -985,6 +990,7 @@ class VulFi(idaapi.action_handler_t):
     # Called when the button is clicked
     def activate(self, ctx):
         answer = 0
+        skip_scan = False
         rows = []
         vulfi_data = {}
         marked_addrs = []
@@ -1019,10 +1025,20 @@ class VulFi(idaapi.action_handler_t):
                 if f.cType.value == 0:
                     # Default scan
                     vulfi_scanner = VulFiScanner()
-                else:
+                elif f.cType.value == 1:
                     try:
                         with open(os.path.join(f.iFileOpen.value),"r") as rules_file:
                             vulfi_scanner = VulFiScanner(json.load(rules_file))
+                    except:
+                        ida_kernwin.warning("Failed to load custom rules!")
+                        return
+                else:
+                    try:
+                        with open(os.path.join(f.iFileOpen.value),"r") as import_file:
+                            import_data = json.load(import_file)
+                        for item in import_data["issues"]:
+                            rows.append([item["IssueName"],item["FunctionName"],item["FoundIn"],item["Address"],item["Status"],item["Priority"],item["Comment"]])
+                        skip_scan = True
                     except:
                         ida_kernwin.warning("Failed to load custom rules!")
                         return
@@ -1033,12 +1049,13 @@ class VulFi(idaapi.action_handler_t):
                 rows.append([vulfi_data[item]["name"],vulfi_data[item]["function"],vulfi_data[item]["in"],vulfi_data[item]["addr"],vulfi_data[item]["status"],vulfi_data[item]["priority"],vulfi_data[item]["comment"]])
                 marked_addrs.append(f'{vulfi_data[item]["name"]}_{vulfi_data[item]["addr"]}')
             # Run the scan
-            print("[VulFi] Started the scan ...")
-            scan_result = vulfi_scanner.start_scan(marked_addrs)
-            if scan_result is None:
-                return
-            rows.extend(scan_result)
-            print("[VulFi] Scan done!")
+            if not skip_scan:
+                print("[VulFi] Started the scan ...")
+                scan_result = vulfi_scanner.start_scan(marked_addrs)
+                if scan_result is None:
+                    return
+                rows.extend(scan_result)
+                print("[VulFi] Scan done!")
             # Save the results
             for item in rows:
                 vulfi_data[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]}
@@ -1106,12 +1123,10 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
             self.items = items
         self.Refresh()
 
-    def Refresh(self):
-        for item in self.items:
-            item[2] = utils.get_func_name(int(item[3],16))
-        ida_kernwin.Choose.Refresh(self)
 
     def OnRefresh(self,n):
+        for item in self.items:
+            item[2] = utils.get_func_name(int(item[3],16))
         if self.delete:
             for i in reversed(n):
                 self.items.pop(i)
