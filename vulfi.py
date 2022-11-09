@@ -938,7 +938,6 @@ class VulFi_Single_Function(idaapi.action_handler_t):
         results_window.AddCommand("Mark as Vulnerable", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Remove Item(s)", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
@@ -1068,7 +1067,6 @@ class VulFi(idaapi.action_handler_t):
         results_window.AddCommand("Mark as Vulnerable", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Remove Item(s)", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
@@ -1106,10 +1104,9 @@ Custom VulFi rule
 
 class VulFiEmbeddedChooser(ida_kernwin.Choose):
     def __init__(self,title,columns,items,icon,embedded=False):
-        ida_kernwin.Choose.__init__(self,title,columns,embedded=embedded,width=100,flags=ida_kernwin.Choose.CH_MULTI)
+        ida_kernwin.Choose.__init__(self,title,columns,embedded=embedded,width=100,flags=ida_kernwin.Choose.CH_MULTI + ida_kernwin.Choose.CH_CAN_REFRESH)
         self.items = items
         self.icon = icon
-        self.multi_selection = []
         self.delete = False
         self.comment = False
 
@@ -1122,7 +1119,6 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         else:
             self.items = items
         self.Refresh()
-
 
     def OnRefresh(self,n):
         for item in self.items:
@@ -1167,19 +1163,10 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         if cmd_id == 3:
             # Comment
             self.comment = True
-            '''comment = ida_kernwin.ask_str(self.items[number][6],1,f"Enter the comment: ")
-            if comment == None:
-                return
-            self.items[number][6] = comment'''
         if cmd_id == 4:
             # Delete selected items
-            #if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete selected item(s)?") == 1:
             self.delete = True
         if cmd_id == 5:
-            # Purge all
-            if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete all VulFi results?") == 1:
-                self.items = []
-        if cmd_id == 6:
             # Export
             # Show the form
             f = vulfi_export_form_t()
@@ -1220,6 +1207,7 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         self.Refresh()
         # Save the data after every change
         self.save()
+        
 
     def OnGetSize(self):
         return len(self.items)
@@ -1231,7 +1219,11 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         ida_kernwin.jumpto(int(destination,16))
 
     def OnGetLine(self,number):
-        return self.items[number]
+        try:
+            return self.items[number]
+        except:
+            self.Refresh()
+            return None
 
 
 class vulfi_fetch_t(idaapi.plugin_t):
