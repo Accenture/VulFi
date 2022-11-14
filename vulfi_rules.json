@@ -146,7 +146,8 @@
             "vsnwprintf_s",
             "vsnwprintf_s_l",
             "__sprintf_chk", 
-            "__vsprintf_chk" 
+            "__vsprintf_chk", 
+            "_stdio_common_vsprintf"
             
         ],
         "wrappers":false,
