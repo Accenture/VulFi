@@ -1085,7 +1085,7 @@ class vulfi_export_form_t(ida_kernwin.Form):
             r"""STARTITEM {id:rJSON}
 BUTTON YES* Save
 BUTTON CANCEL Cancel
-Custom VulFi rule
+VulFi Results Export
 
 {FormChangeCb}
 <##Choose format for export##JSON:{rJSON}>
@@ -1109,6 +1109,7 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         self.icon = icon
         self.delete = False
         self.comment = False
+        self.export = False
 
     def GetItems(self):
         return self.items
@@ -1137,6 +1138,10 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
                 self.items[i][6] = comment
             self.comment = False
             self.save()
+        if self.export:
+            self.export = False
+            self.vulfi_export()
+            
         return n
 
     def save(self):
@@ -1168,45 +1173,49 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
             self.delete = True
         if cmd_id == 5:
             # Export
-            # Show the form
-            f = vulfi_export_form_t()
-            # Compile (in order to populate the controls)
-            f.Compile()
-            # Execute the form
-            ok = f.Execute()
-            # If the form was confirmed
-            if ok == 1:
-                # Get file name
-                file_name = f.iFileOpen.value
-                if file_name:
-                    if f.cType.value == 0:
-                        # JSON
-                        # Pretify 
-                        tmp_json = {"issues":[]}
-                        for item in self.items:
-                            tmp_json["issues"].append({
-                                "IssueName": item[0],
-                                "FunctionName": item[1],
-                                "FoundIn": item[2],
-                                "Address": item[3],
-                                "Status": item[4],
-                                "Priority": item[5],
-                                "Comment": item[6]
-                            })
-                        with open(file_name,"w") as out_file:
-                            json.dump(tmp_json, out_file)
-                        ida_kernwin.info(f"Results exported in JSON format to {file_name}")
-                    else:
-                        #CSV
-                        csv_string = "IssueName,FunctionName,FoundIn,Address,Status,Priority,Comment\n"
-                        for item in self.items:
-                            csv_string += f"{item[0]},{item[1]},{item[2]},{item[3]},{item[4]},{item[5]},{item[6]}\n"
-                        with open(file_name,"w") as out_file:
-                            out_file.write(csv_string)
-                        ida_kernwin.info(f"Results exported in comma-separated CSV file to {file_name}")
+            self.export = True
+            
         self.Refresh()
         # Save the data after every change
         self.save()
+
+    def vulfi_export(self):
+        # Show the form
+        f = vulfi_export_form_t()
+        # Compile (in order to populate the controls)
+        f.Compile()
+        # Execute the form
+        ok = f.Execute()
+        # If the form was confirmed
+        if ok == 1:
+            # Get file name
+            file_name = f.iFileOpen.value
+            if file_name:
+                if f.cType.value == 0:
+                    # JSON
+                    # Pretify 
+                    tmp_json = {"issues":[]}
+                    for item in self.items:
+                        tmp_json["issues"].append({
+                            "IssueName": item[0],
+                            "FunctionName": item[1],
+                            "FoundIn": item[2],
+                            "Address": item[3],
+                            "Status": item[4],
+                            "Priority": item[5],
+                            "Comment": item[6]
+                        })
+                    with open(file_name,"w") as out_file:
+                        json.dump(tmp_json, out_file)
+                    ida_kernwin.info(f"Results exported in JSON format to {file_name}")
+                else:
+                    #CSV
+                    csv_string = "IssueName,FunctionName,FoundIn,Address,Status,Priority,Comment\n"
+                    for item in self.items:
+                        csv_string += f"{item[0]},{item[1]},{item[2]},{item[3]},{item[4]},{item[5]},{item[6]}\n"
+                    with open(file_name,"w") as out_file:
+                        out_file.write(csv_string)
+                    ida_kernwin.info(f"Results exported in comma-separated CSV file to {file_name}")
         
 
     def OnGetSize(self):
