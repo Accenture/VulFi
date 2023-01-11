@@ -6,11 +6,6 @@
 ![multi](./img/multi_select.gif)
 * It is now possible to export results in comma-separated CSV format and JSON. When starting new scan via `Search > Vulfi` menu item, you can now select `Import` action and use previously exported `JSON` file. Please note that it is neccessary to have exactly the same offsets within the file. Therefore, it is recommended to share the whole database.
 
-## Improvements of existing features
-
-* Updated rules based on the TODO issue/commit
-
-
 # Version 2.0
 
 ## Quality of life improvements
