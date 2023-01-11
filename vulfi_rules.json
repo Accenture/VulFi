@@ -147,7 +147,8 @@
             "vsnwprintf_s",
             "vsnwprintf_s_l",
             "__sprintf_chk", 
-            "__vsprintf_chk" 
+            "__vsprintf_chk", 
+            "_stdio_common_vsprintf"
             
         ],
         "wrappers":false,
@@ -281,7 +282,7 @@
         "wrappers":false,
         "mark_if":{
             "High":"any([(not param[i+1].used_in_call_before(['strlen']) and not param[i+1].is_constant()) for i in range(len(param[1].string_value().split('%'))) if param[1].string_value().split('%')[i].startswith('s')])",
-            "Medium":"'%s' in param[1].string_value()",
+            "Medium":"any([not param[i+1].is_constant() for i in range(len(param[1].string_value().split('%'))) if param[1].string_value().split('%')[i].startswith('s')])",
             "Low": "True"
         }
     },

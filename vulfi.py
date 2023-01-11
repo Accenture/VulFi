@@ -117,7 +117,11 @@ class VulFiScanner:
         ida_kernwin.show_wait_box("VulFi scan running ... ")
         self.prepare_functions_list()
         for rule in self.rules:
-            xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
+            try:
+                xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
+            except:
+                ida_kernwin.warning("This does not seem like a correct rule file. Aborting scan.")
+                return
             for scanned_function in xrefs_dict:
             # For each function in the rules
                 skip_count = 0
@@ -182,6 +186,7 @@ class VulFiScanner:
                         ida_kernwin.warning(f"The rule \"{rule}\" is not valid!")
                         continue
                     # If the rule matched and is not wrapped:
+                    #if priority and found_in_name and not "wrapped" in scanned_function_display_name:
                     if priority and not "wrapped" in scanned_function_display_name:
                         results.append(list(VulFi.result_window_row(rule["name"],scanned_function_display_name,found_in_name,hex(scanned_function_xref),"Not Checked",priority,"")))
                     elif "wrapped" in scanned_function_display_name and priority:
@@ -932,8 +937,8 @@ class VulFi_Single_Function(idaapi.action_handler_t):
         results_window.AddCommand("Mark as Suspicious", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Mark as Vulnerable", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Remove Item", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Remove Item(s)", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
 
@@ -954,12 +959,13 @@ Custom VulFi rule
 
 {FormChangeCb}
 <##What rule set to use?##Default rules:{rDefault}>
-<Custom rules:{rCustom}>{cType}>
+<Custom rules:{rCustom}>
+<Import previous results (JSON):{rImport}>{cType}>
 <#Select a file to open#Browse to open:{iFileOpen}>
 
 """, {
             'iFileOpen': F.FileInput(open=True),
-            'cType': F.RadGroupControl(("rDefault", "rCustom")),
+            'cType': F.RadGroupControl(("rDefault", "rCustom","rImport")),
             'FormChangeCb': F.FormChangeCb(self.OnFormChange)
         })
 
@@ -983,6 +989,7 @@ class VulFi(idaapi.action_handler_t):
     # Called when the button is clicked
     def activate(self, ctx):
         answer = 0
+        skip_scan = False
         rows = []
         vulfi_data = {}
         marked_addrs = []
@@ -1017,10 +1024,20 @@ class VulFi(idaapi.action_handler_t):
                 if f.cType.value == 0:
                     # Default scan
                     vulfi_scanner = VulFiScanner()
-                else:
+                elif f.cType.value == 1:
                     try:
                         with open(os.path.join(f.iFileOpen.value),"r") as rules_file:
                             vulfi_scanner = VulFiScanner(json.load(rules_file))
+                    except:
+                        ida_kernwin.warning("Failed to load custom rules!")
+                        return
+                else:
+                    try:
+                        with open(os.path.join(f.iFileOpen.value),"r") as import_file:
+                            import_data = json.load(import_file)
+                        for item in import_data["issues"]:
+                            rows.append([item["IssueName"],item["FunctionName"],item["FoundIn"],item["Address"],item["Status"],item["Priority"],item["Comment"]])
+                        skip_scan = True
                     except:
                         ida_kernwin.warning("Failed to load custom rules!")
                         return
@@ -1031,12 +1048,13 @@ class VulFi(idaapi.action_handler_t):
                 rows.append([vulfi_data[item]["name"],vulfi_data[item]["function"],vulfi_data[item]["in"],vulfi_data[item]["addr"],vulfi_data[item]["status"],vulfi_data[item]["priority"],vulfi_data[item]["comment"]])
                 marked_addrs.append(f'{vulfi_data[item]["name"]}_{vulfi_data[item]["addr"]}')
             # Run the scan
-            print("[VulFi] Started the scan ...")
-            scan_result = vulfi_scanner.start_scan(marked_addrs)
-            if scan_result is None:
-                return
-            rows.extend(scan_result)
-            print("[VulFi] Scan done!")
+            if not skip_scan:
+                print("[VulFi] Started the scan ...")
+                scan_result = vulfi_scanner.start_scan(marked_addrs)
+                if scan_result is None:
+                    return
+                rows.extend(scan_result)
+                print("[VulFi] Scan done!")
             # Save the results
             for item in rows:
                 vulfi_data[f"{item[3]}_{item[0]}"] = {"name":item[0],"function":item[1],"in":item[2],"addr":item[3],"status":item[4],"priority":item[5],"comment":item[6]}
@@ -1048,8 +1066,8 @@ class VulFi(idaapi.action_handler_t):
         results_window.AddCommand("Mark as Suspicious", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Mark as Vulnerable", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.AddCommand("Set Vulfi Comment", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Remove Item", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
-        results_window.AddCommand("Purge All Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Remove Item(s)", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
+        results_window.AddCommand("Export Results", flags=4, menu_index=-1, icon=icon_id, emb=None, shortcut=None)
         results_window.Show()
         hooks.set_chooser(results_window)
 
@@ -1058,12 +1076,40 @@ class VulFi(idaapi.action_handler_t):
     def update(self, ctx):
         return idaapi.AST_ENABLE_ALWAYS
 
+class vulfi_export_form_t(ida_kernwin.Form):
+
+    def __init__(self):
+        F = ida_kernwin.Form
+        F.__init__(
+            self,
+            r"""STARTITEM {id:rJSON}
+BUTTON YES* Save
+BUTTON CANCEL Cancel
+VulFi Results Export
+
+{FormChangeCb}
+<##Choose format for export##JSON:{rJSON}>
+<CSV:{rCSV}>{cType}>
+<#Select the output file#Select the output file:{iFileOpen}>
+
+""", {
+            'iFileOpen': F.FileInput(save=True),
+            'cType': F.RadGroupControl(("rJSON", "rCSV")),
+            'FormChangeCb': F.FormChangeCb(self.OnFormChange)
+        })
+
+    def OnFormChange(self,fid):
+        return 1
+
 
 class VulFiEmbeddedChooser(ida_kernwin.Choose):
     def __init__(self,title,columns,items,icon,embedded=False):
-        ida_kernwin.Choose.__init__(self,title,columns,embedded=embedded,width=100)
+        ida_kernwin.Choose.__init__(self,title,columns,embedded=embedded,width=100,flags=ida_kernwin.Choose.CH_MULTI + ida_kernwin.Choose.CH_CAN_REFRESH)
         self.items = items
         self.icon = icon
+        self.delete = False
+        self.comment = False
+        self.export = False
 
     def GetItems(self):
         return self.items
@@ -1075,10 +1121,28 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
             self.items = items
         self.Refresh()
 
-    def Refresh(self):
+    def OnRefresh(self,n):
         for item in self.items:
             item[2] = utils.get_func_name(int(item[3],16))
-        ida_kernwin.Choose.Refresh(self)
+        if self.delete:
+            for i in reversed(n):
+                self.items.pop(i)
+            self.delete = False
+            self.save()
+        if self.comment:
+            if len(n) == 1:
+                comment = ida_kernwin.ask_str(self.items[n[0]][6],1,f"Enter the comment: ")
+            else:
+                comment = ida_kernwin.ask_str("",1,f"Enter the comment: ")
+            for i in n:
+                self.items[i][6] = comment
+            self.comment = False
+            self.save()
+        if self.export:
+            self.export = False
+            self.vulfi_export()
+            
+        return n
 
     def save(self):
         # On close dumps the results
@@ -1103,32 +1167,72 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
             self.items[number][4] = status
         if cmd_id == 3:
             # Comment
-            comment = ida_kernwin.ask_str(self.items[number][6],1,f"Enter the comment: ")
-            if comment == None:
-                return
-            self.items[number][6] = comment
+            self.comment = True
         if cmd_id == 4:
-            # Delete one item
-            if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete item {self.items[number][0]} - {self.items[number][1]} found at address {self.items[number][3]}?") == 1:
-                self.items.pop(number)
+            # Delete selected items
+            self.delete = True
         if cmd_id == 5:
-            # Purge all
-            if ida_kernwin.ask_buttons("Yes","No","Cancel",0,f"Do you really want to delete all VulFi results?") == 1:
-                self.items = []
+            # Export
+            self.export = True
+            
         self.Refresh()
         # Save the data after every change
         self.save()
+
+    def vulfi_export(self):
+        # Show the form
+        f = vulfi_export_form_t()
+        # Compile (in order to populate the controls)
+        f.Compile()
+        # Execute the form
+        ok = f.Execute()
+        # If the form was confirmed
+        if ok == 1:
+            # Get file name
+            file_name = f.iFileOpen.value
+            if file_name:
+                if f.cType.value == 0:
+                    # JSON
+                    # Pretify 
+                    tmp_json = {"issues":[]}
+                    for item in self.items:
+                        tmp_json["issues"].append({
+                            "IssueName": item[0],
+                            "FunctionName": item[1],
+                            "FoundIn": item[2],
+                            "Address": item[3],
+                            "Status": item[4],
+                            "Priority": item[5],
+                            "Comment": item[6]
+                        })
+                    with open(file_name,"w") as out_file:
+                        json.dump(tmp_json, out_file)
+                    ida_kernwin.info(f"Results exported in JSON format to {file_name}")
+                else:
+                    #CSV
+                    csv_string = "IssueName,FunctionName,FoundIn,Address,Status,Priority,Comment\n"
+                    for item in self.items:
+                        csv_string += f"{item[0]},{item[1]},{item[2]},{item[3]},{item[4]},{item[5]},{item[6]}\n"
+                    with open(file_name,"w") as out_file:
+                        out_file.write(csv_string)
+                    ida_kernwin.info(f"Results exported in comma-separated CSV file to {file_name}")
+        
 
     def OnGetSize(self):
         return len(self.items)
 
     def OnSelectLine(self,number):
-        row = VulFi.result_window_row(*self.items[number])
+        # By default change to first selected line
+        row = VulFi.result_window_row(*self.items[number[0]])
         destination = row.Address
         ida_kernwin.jumpto(int(destination,16))
 
     def OnGetLine(self,number):
-        return self.items[number]
+        try:
+            return self.items[number]
+        except:
+            self.Refresh()
+            return None
 
 
 class vulfi_fetch_t(idaapi.plugin_t):

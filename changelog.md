@@ -1,3 +1,11 @@
+# Version 2.1
+
+## Quality of life improvements
+
+* Within the VulFi view, you can now use multi-select operations (in case that you do not see the changes take effect press `Ctrl+U` with any item selected to manually refresh the view). This allows to perform operations such as deletion, status changes or adding comments on multiple rows at once. (Also `Purge All Results` command was removed as it makes no sense at this point)
+![multi](./img/multi_select.gif)
+* It is now possible to export results in comma-separated CSV format and JSON. When starting new scan via `Search > Vulfi` menu item, you can now select `Import` action and use previously exported `JSON` file. Please note that it is neccessary to have exactly the same offsets within the file. Therefore, it is recommended to share the whole database.
+
 # Version 2.0
 
 ## Quality of life improvements

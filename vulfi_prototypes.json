@@ -313,6 +313,7 @@
     "vsprintf":"int vsprintf(char* buffer, char* format, va_list argptr);",
     "___vsprintf_chk":"int __vsprintf_chk(char* s, int flag, int slen, char* format, va_list args);",
     "__vsprintf_chk":"int __vsprintf_chk(char* s, int flag, int slen, char* format, va_list args);",
+    "_stdio_common_vsprintf":"int _stdio_common_vsprintf(int options, char *buffer, int bufferCount, char *format, void* locale, va_list argptr);",
     ".vsprintf_l":"int vsprintf_l(char* buffer, char* format, void* locale, va_list argptr);",
     "_vsprintf_l":"int vsprintf_l(char* buffer, char* format, void* locale, va_list argptr);",
     "vsprintf_l":"int vsprintf_l(char* buffer, char* format, void* locale, va_list argptr);",
