@@ -33,7 +33,10 @@ class utils:
 
     def get_func_name(ea):
         # Get pretty function name
-        return utils.get_pretty_func_name(idc.get_func_name(ea))
+        func_name = utils.get_pretty_func_name(idc.get_func_name(ea))
+        if not func_name:
+            func_name = utils.get_pretty_func_name(idc.get_name(ea))
+        return func_name
 
     def get_pretty_func_name(name):
         # Demangle function name
