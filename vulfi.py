@@ -1230,6 +1230,14 @@ class VulFiEmbeddedChooser(ida_kernwin.Choose):
         destination = row.Address
         ida_kernwin.jumpto(int(destination,16))
 
+    def OnGetLineAttr(self, number):
+        if self.items[number][4] == "False Positive":
+            return (0x9D9D9D,0)
+        elif self.items[number][4] == "Suspicious":
+            return (0xd0FF,0)
+        elif self.items[number][4] == "Vulnerable":
+            return (0xFF,0)
+
     def OnGetLine(self,number):
         try:
             return self.items[number]
