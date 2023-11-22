@@ -121,10 +121,13 @@ class VulFiScanner:
         self.prepare_functions_list()
         for rule in self.rules:
             try:
-                xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
+                if rule["function_names"] == ["Array Access"]:
+                    xrefs_dict = self.get_array_accesses()
+                else:
+                    xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
             except:
                 ida_kernwin.warning("This does not seem like a correct rule file. Aborting scan.")
-                return
+                return None
             for scanned_function in xrefs_dict:
             # For each function in the rules
                 skip_count = 0
@@ -152,17 +155,20 @@ class VulFiScanner:
                         continue
                     # For each xref to the function in the rules
                     # If ida_hexrays can be used eval the conditions in the rules file
-                    params_raw = self.get_xref_parameters(scanned_function_xref,scanned_function_name)
-                    if params_raw is None:
-                        if self.hexrays:
-                            # Likely decompiler failure, we have to skip
-                            continue
-                        else:
-                            # Params were not found, lets mark all XREFS
-                            params_raw = []
-                    for p in params_raw:
-                        param.append(VulFiScanner.Param(self,p,scanned_function_xref,scanned_function_name))
-                    param_count = len(param)
+                    if rule["function_names"] == ["Array Access"]:
+                        param = [VulFiScanner.Param(self,scanned_function_xref_tuple[3],scanned_function_xref,scanned_function_name)]
+                    else:
+                        params_raw = self.get_xref_parameters(scanned_function_xref,scanned_function_name)
+                        if params_raw is None:
+                            if self.hexrays:
+                                # Likely decompiler failure, we have to skip
+                                continue
+                            else:
+                                # Params were not found, lets mark all XREFS
+                                params_raw = []
+                        for p in params_raw:
+                            param.append(VulFiScanner.Param(self,p,scanned_function_xref,scanned_function_name))
+                        param_count = len(param)
 
                     function_call = VulFiScanner.FunctionCall(self,scanned_function_xref,scanned_function_name)
                     # Name of the function where the xref is located
@@ -199,6 +205,22 @@ class VulFiScanner:
                         skip_count = int(scanned_function_display_name[scanned_function_display_name.find("wrapped:") + 8:-1])
         ida_kernwin.hide_wait_box()
         return results
+    
+    def get_array_accesses(self):
+        array_access_list = {"Array Access":[]}
+        if self.hexrays:
+            for func in self.functions_list:
+                try:
+                    decompiled_function = ida_hexrays.decompile(func)
+                    code = decompiled_function.pseudocode
+                    for citem in decompiled_function.treeitems:
+                        if citem.op == ida_hexrays.cot_idx:
+                            # Uses a trick by adding the index expression as a hidden 4th member of tuple
+                            array_access_list["Array Access"].append((citem.ea,"Array Access","Array Access",citem.to_specific_type.y))
+                except Exception as e:
+                    pass
+
+        return array_access_list
 
     def prepare_functions_list(self):
         self.functions_list = []
@@ -452,16 +474,17 @@ class VulFiScanner:
 
         def is_sign_compared_hexrays(self):
             decompiled_function = ida_hexrays.decompile(self.call_xref)
-            code = decompiled_function.pseudocode
-            for citem in decompiled_function.treeitems:
-                if citem.ea == self.call_xref:
-                    parent = decompiled_function.body.find_parent_of(citem)
-                    while parent:
-                        if parent.op == ida_hexrays.cit_if:
-                            comps = self.__get_signed_comparisons(parent)
-                            if self.__is_var_used_in_comparison(comps):
-                                return True
-                        parent = decompiled_function.body.find_parent_of(parent)
+            if decompiled_function:
+                code = decompiled_function.pseudocode
+                for citem in decompiled_function.treeitems:
+                    if citem.ea == self.call_xref:
+                        parent = decompiled_function.body.find_parent_of(citem)
+                        while parent:
+                            if parent.op == ida_hexrays.cit_if:
+                                comps = self.__get_signed_comparisons(parent)
+                                if self.__is_var_used_in_comparison(comps):
+                                    return True
+                            parent = decompiled_function.body.find_parent_of(parent)
             return False
         
         def __is_var_used_in_comparison(self,comp_list):

@@ -427,7 +427,7 @@
         ],
         "wrappers":false,
         "mark_if":{
-            "High":"not param[2].is_sign_compared()",
+            "High":"param[2].is_sign_compared()",
             "Medium":"False",
             "Low": "False"
         }
@@ -440,7 +440,18 @@
         ],
         "wrappers":false,
         "mark_if":{
-            "High":"not param[1].is_sign_compared()",
+            "High":"param[1].is_sign_compared()",
+            "Medium":"False",
+            "Low": "False"
+        }
+    },{
+        "name": "Signed Comparison Issue",
+        "function_names":[
+            "Array Access"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"param[0].is_sign_compared()",
             "Medium":"False",
             "Low": "False"
         }
