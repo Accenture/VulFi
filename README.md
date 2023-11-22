@@ -75,9 +75,7 @@ An example rule that looks for all cross-references to function `malloc` and che
 {
     "name": "Possible Null Pointer Dereference",
     "function_names":[
-        "malloc",
-        "_malloc",
-        ".malloc"
+        "malloc"
     ],
     "wrappers":false,
     "mark_if":{

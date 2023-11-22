@@ -442,6 +442,57 @@ class VulFiScanner:
                 if utils.get_func_name(call.x.obj_ea) in tmp_fun_list and not self.__is_before_call(call.ea):
                     return True
             return False
+        
+        def is_sign_compared(self):
+            if self.scanner_instance.hexrays:
+                return self.is_sign_compared_hexrays()
+            else:
+                return False
+
+
+        def is_sign_compared_hexrays(self):
+            decompiled_function = ida_hexrays.decompile(self.call_xref)
+            code = decompiled_function.pseudocode
+            for citem in decompiled_function.treeitems:
+                if citem.ea == self.call_xref:
+                    parent = decompiled_function.body.find_parent_of(citem)
+                    while parent:
+                        if parent.op == ida_hexrays.cit_if:
+                            comps = self.__get_signed_comparisons(parent)
+                            if self.__is_var_used_in_comparison(comps):
+                                return True
+                        parent = decompiled_function.body.find_parent_of(parent)
+            return False
+        
+        def __is_var_used_in_comparison(self,comp_list):
+            if self.param.op == ida_hexrays.cot_cast:
+                param = self.param.x
+            else:
+                param = self.param
+            ops = comp_list.copy()
+            while ops:
+                op = ops.pop()
+                if not op:
+                    continue
+                if param == op:
+                    return True
+                ops.extend([op.x,op.y])
+            return False
+        
+        def __get_signed_comparisons(self,citem):
+            signed_comparisons = []
+            signed_ops = [ida_hexrays.cot_sge, ida_hexrays.cot_sle, ida_hexrays.cot_sgt, ida_hexrays.cot_slt]
+            exprs = [citem.to_specific_type.cif.expr]
+            while exprs:
+                expr = exprs.pop()
+                if not expr:
+                    continue
+                if expr.op in signed_ops:
+                    signed_comparisons.append(expr)
+                else:
+                    exprs.extend([expr.x,expr.y])
+            return signed_comparisons
+
 
         def used_in_call_after_disass(self,function_list):
             return False
@@ -761,7 +812,7 @@ class VulFiScanner:
                         parent = decompiled_function.body.find_parent_of(tree_item)
                         if parent.op == ida_hexrays.cot_cast: # return value is casted
                             parent = decompiled_function.body.find_parent_of(parent)
-                        if (parent.op >= 22 and parent.op <= 31):
+                        if (parent.op >= ida_hexrays.cot_eq and parent.op <= ida_hexrays.cot_ult):
                             if check_val is not None:
                                 parent = parent.to_specific_type
                                 if parent.y and (parent.y.n or parent.y.fpc): # Check if there is a Y operand and if it is a number, if it is, get its value
