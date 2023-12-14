@@ -1,8 +1,10 @@
-# VulFi v2.1
+# VulFi v3.0
 
 ## Introduction 
 
 The VulFi (Vulnerability Finder) tool is a plugin to IDA Pro which can be used to assist during bug hunting in binaries. Its main objective is to provide a single view with all cross-references to the most interesting functions (such as `strcpy`, `sprintf`, `system`, etc.). For cases where a Hexrays decompiler can be used, it will attempt to rule out calls to these functions which are not interesting from a vulnerability research perspective (think something like `strcpy(dst,"Hello World!")`). Without the decompiler, the rules are much simpler (to not depend on architecture) and thus only rule out the most obvious cases.
+
+See [Changelog](./changelog.md) for more information on updates.
 
 ## Installation
 
@@ -75,9 +77,7 @@ An example rule that looks for all cross-references to function `malloc` and che
 {
     "name": "Possible Null Pointer Dereference",
     "function_names":[
-        "malloc",
-        "_malloc",
-        ".malloc"
+        "malloc"
     ],
     "wrappers":false,
     "mark_if":{
@@ -89,6 +89,13 @@ An example rule that looks for all cross-references to function `malloc` and che
 ```
 
 ### Rules
+
+#### Helpers for non-function constructs
+
+* `Loop Check` - Marks all loops. In such case `param[0]` is the counter of the loop (if detected) and `param[1]` is the condition against which the counter is checked to termiante the loop.
+* `Array Access` - Marks all array accesses. In this case `param[0]` is the array and `param[1]` is the index.
+
+Same functions could be used when creating rules as for normal function parameters (anything that can be called on `param[<index>]`).
 
 #### Available Variables
 
@@ -105,6 +112,8 @@ An example rule that looks for all cross-references to function `malloc` and che
 * Is return value of a function checked: `function_call.return_value_checked(<constant_to_check>)`
 * Is the parameter also used as a parameter in one of the calls to a specified list of functions before/after: `param[<index>].used_in_call_<before|after>(["function1","function2"])`
 * Is the call to the selected function reachable from a specific other function: `function_call.reachable_from("<function_name>")`
+* Is the parameter part of a singed comparison: `param[<index>].is_sign_compared()`
+* Is the parameter used as an array index within current function: `param[<index>].used_as_index()`
 
 #### Examples
 

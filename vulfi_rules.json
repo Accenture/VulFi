@@ -203,7 +203,7 @@
         ],
         "wrappers":false,
         "mark_if":{
-            "High":"not param[1].is_constant() and not param[1].used_in_call_after(['strlen'])",
+            "High":"not param[1].is_constant() and not param[1].used_in_call_before(['strlen'])",
             "Medium":"False",
             "Low": "not param[1].is_constant()"
         }
@@ -410,6 +410,61 @@
             "High":"not param[2].is_constant()",
             "Medium":"False",
             "Low": "False"
+        }
+    },
+    {
+        "name": "Signed Comparison Issue",
+        "function_names":[
+            "memcpy",
+            "memmove",
+            "strncpy",
+            "strncat",
+            "memset",
+            "memchr",
+            "memrchr",
+            "read",
+            "write"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"param[2].is_sign_compared()",
+            "Medium":"False",
+            "Low": "False"
+        }
+    },
+    {
+        "name": "Signed Comparison Issue",
+        "function_names":[
+            "snprintf",
+            "vsnprintf"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"param[1].is_sign_compared()",
+            "Medium":"False",
+            "Low": "False"
+        }
+    },{
+        "name": "Signed Comparison Issue",
+        "function_names":[
+            "Array Access"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"param[1].is_sign_compared()",
+            "Medium":"False",
+            "Low": "False"
+        }
+    },{
+        "name": "Unbound Loop",
+        "function_names":[
+            "Loop Check"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"not param[1].is_constant() and param[0].used_as_index()",
+            "Medium":"not param[1].is_constant()",
+            "Low": "param[1].number_value() in [0,1] or param[0].used_as_index()"
         }
     }
 ]
