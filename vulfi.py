@@ -230,9 +230,9 @@ class VulFiScanner:
                     code = decompiled_function.pseudocode
                     for tree_item in decompiled_function.treeitems:
                         if tree_item.op == ida_hexrays.cit_while:
-                            print(f"[*] Found 'while' loop at: {hex(tree_item.ea)} ({ida_name.get_ea_name(func)})")
+                            #print(f"[*] Found 'while' loop at: {hex(tree_item.ea)} ({ida_name.get_ea_name(func)})")
                             op = tree_item.to_specific_type.cwhile.expr.op
-                            if op >= ida_hexrays.cot_land and op <= ida_hexrays.cot_ult:
+                            if (op >= ida_hexrays.cot_land and op <= ida_hexrays.cot_ult) or op in [ida_hexrays.cot_var, ida_hexrays.cot_lnot]:
                                 # Not an infinte loop
                                 counter, check_val = self.parse_condition(tree_item.to_specific_type.cwhile.expr)
                                 loop_check_list["Loop Check"].append((tree_item.ea,"Loop Check","Loop Check",counter,check_val))
@@ -240,7 +240,7 @@ class VulFiScanner:
                                 counter, check_val = self.get_loop_check_val_break(tree_item.to_specific_type.cwhile.body)
                                 loop_check_list["Loop Check"].append((tree_item.ea,"Loop Check","Loop Check",counter,check_val))
                         elif tree_item.op == ida_hexrays.cit_for:
-                            print(f"[*] Found 'for' loop at: {hex(tree_item.ea)} ({ida_name.get_ea_name(func)})")
+                            #print(f"[*] Found 'for' loop at: {hex(tree_item.ea)} ({ida_name.get_ea_name(func)})")
                             if tree_item.to_specific_type.cfor.expr.op == ida_hexrays.cot_empty:
                                 # Handle endless FOR loop
                                 body = tree_item.to_specific_type.cfor.body
@@ -248,9 +248,16 @@ class VulFiScanner:
                                 loop_check_list["Loop Check"].append((tree_item.ea,"Loop Check","Loop Check",counter,check_val))
                             else:
                                 counter = tree_item.to_specific_type.cfor.init.x
-                                loop_check_list["Loop Check"].append((tree_item.ea,"Loop Check","Loop Check",counter,self.get_loop_check_val(tree_item.to_specific_type.cfor.expr)))
+                                loop_check_list["Loop Check"].append((tree_item.ea,"Loop Check","Loop Check",counter,self.get_loop_check_val(counter,tree_item.to_specific_type.cfor.expr)))
                         elif tree_item.op == ida_hexrays.cit_do:
-                            print(f"[*] Found 'do-while' loop at: {hex(tree_item.ea)} ({ida_name.get_ea_name(func)})")
+                            op = tree_item.to_specific_type.cdo.expr.op
+                            if op >= ida_hexrays.cot_land and op <= ida_hexrays.cot_ult or op in [ida_hexrays.cot_var, ida_hexrays.cot_lnot]:
+                                # Not an infinte loop
+                                counter, check_val = self.parse_condition(tree_item.to_specific_type.cdo.expr)
+                                loop_check_list["Loop Check"].append((tree_item.ea,"Loop Check","Loop Check",counter,check_val))
+                            else:
+                                counter, check_val = self.get_loop_check_val_break(tree_item.to_specific_type.cdo.body)
+                                loop_check_list["Loop Check"].append((tree_item.ea,"Loop Check","Loop Check",counter,check_val))
                 except Exception as e:
                     print(e)
 
@@ -260,21 +267,25 @@ class VulFiScanner:
         if condition.op == ida_hexrays.cot_lnot:
             #(!x)
             return condition.x, utils.create_dummy_hexrays_const(0)
-        if condition.op == ida_hexrays.cot_var:
+        if condition.op == ida_hexrays.cot_var or condition.op == ida_hexrays.cot_call or condition.op == ida_hexrays.cot_cast:
             #(x)
             return condition.x, utils.create_dummy_hexrays_const(1)
         if condition.op >= ida_hexrays.cot_eq and condition.op <= ida_hexrays.cot_ult:
             #(x > y)
             return condition.x, condition.y
         if condition.op == ida_hexrays.cot_lor or condition.op == ida_hexrays.cot_land:
-            return self.parse_condition(condition.x)
+            x_cond = self.parse_condition(condition.x)
+            y_cond = self.parse_condition(condition.y)
+            if y_cond[1].n:
+                return y_cond
+            return x_cond
     
-    def get_loop_check_val(self,comparison):
+    def get_loop_check_val(self,counter,comparison):
         x,y = self.parse_condition(comparison)
-        #if x == counter:
-        return y
+        if x == counter:
+            return y
         # IDA places constant into the y operand for normal comparisons, for everything else we should return X to avoid marking that as a const
-        #return x
+        return x
 
     def get_loop_check_val_break(self,loop_body):
         bd = loop_body.cblock.begin()
@@ -295,7 +306,7 @@ class VulFiScanner:
                 found_breaks = self.find_break(bt.cur.cif)
                 if found_breaks:
                     return found_breaks
-            elif bt.cur.op == ida_hexrays.cit_break:
+            elif bt.cur.op == ida_hexrays.cit_break or bt.cur.op == ida_hexrays.cit_return:
                 return if_insn
             bt.next()
             
@@ -306,7 +317,7 @@ class VulFiScanner:
                     found_breaks = self.find_break(be.cur.cif)
                     if found_breaks:
                         return found_breaks
-                elif be.cur.op == ida_hexrays.cit_break:
+                elif be.cur.op == ida_hexrays.cit_break or bt.cur.op == ida_hexrays.cit_return:
                     return if_insn
                 be.next()
         return None
@@ -515,6 +526,23 @@ class VulFiScanner:
             self.param = param
             self.call_xref = call_xref
             self.scanned_function = scanned_function
+
+
+        def used_as_index(self):
+            if self.scanner_instance.hexrays:
+                return self.used_as_index_hexrays()
+            else:
+                return False
+            
+        def used_as_index_hexrays(self):
+            decompiled_function = ida_hexrays.decompile(self.call_xref)
+            if decompiled_function:
+                code = decompiled_function.pseudocode
+                for citem in decompiled_function.treeitems:
+                    if citem.op == ida_hexrays.cot_idx:
+                        if citem.to_specific_type.y == self.param:
+                            return True
+            return False
 
         def is_constant(self):
             if self.string_value() == "" and self.number_value() == None:

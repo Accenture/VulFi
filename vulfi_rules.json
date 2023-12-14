@@ -455,5 +455,16 @@
             "Medium":"False",
             "Low": "False"
         }
+    },{
+        "name": "Unbound Loop",
+        "function_names":[
+            "Loop Check"
+        ],
+        "wrappers":false,
+        "mark_if":{
+            "High":"not param[1].is_constant() and param[0].used_as_index()",
+            "Medium":"not param[1].is_constant()",
+            "Low": "param[1].number_value() in [0,1] or param[0].used_as_index()"
+        }
     }
 ]
