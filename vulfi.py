@@ -167,7 +167,7 @@ class VulFiScanner:
                     # For each xref to the function in the rules
                     # If ida_hexrays can be used eval the conditions in the rules file
                     if rule["function_names"] == ["Array Access"]:
-                        param = [VulFiScanner.Param(self,scanned_function_xref_tuple[3],scanned_function_xref,scanned_function_name)]
+                        param = [VulFiScanner.Param(self,scanned_function_xref_tuple[3],scanned_function_xref,scanned_function_name),VulFiScanner.Param(self,scanned_function_xref_tuple[4],scanned_function_xref,scanned_function_name)]
                     elif rule["function_names"] == ["Loop Check"]:
                         param = [VulFiScanner.Param(self,scanned_function_xref_tuple[3],scanned_function_xref,scanned_function_name),VulFiScanner.Param(self,scanned_function_xref_tuple[4],scanned_function_xref,scanned_function_name)]
                     else:
@@ -333,7 +333,7 @@ class VulFiScanner:
                     for citem in decompiled_function.treeitems:
                         if citem.op == ida_hexrays.cot_idx:
                             # Uses a trick by adding the index expression as a hidden 4th member of tuple
-                            array_access_list["Array Access"].append((citem.ea,"Array Access","Array Access",citem.to_specific_type.y))
+                            array_access_list["Array Access"].append((citem.ea,"Array Access","Array Access",citem.to_specific_type.x,citem.to_specific_type.y))
                 except Exception as e:
                     pass
         return array_access_list

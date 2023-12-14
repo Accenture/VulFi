@@ -1,3 +1,15 @@
+# Version 3.0
+
+## Quality of life improvements
+
+* Items in the result list are now higlighted with color based on their status.
+
+## New features
+
+* Tracking of Arrays and Loops is now added. Default rules now contain checks for unbound loops and signed comparions issues (HexRays only for now).
+* Parameters can now be checked with `used_as_index()` and `is_sign_compared()`.
+
+
 # Version 2.1
 
 ## Quality of life improvements
