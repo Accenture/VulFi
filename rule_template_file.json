@@ -1,7 +1,7 @@
 [
     {
         "name": "RULE NAME",
-        "alt_names":[
+        "function_names":[
             "function_name_to_look_for"
         ],
         "wrappers":true,

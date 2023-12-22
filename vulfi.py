@@ -136,7 +136,7 @@ class VulFiScanner:
                     xrefs_dict = self.get_loops()
                 else:
                     xrefs_dict = self.find_xrefs_by_name(rule["function_names"],rule["wrappers"])
-            except:
+            except Exception as e:
                 ida_kernwin.warning("This does not seem like a correct rule file. Aborting scan.")
                 return None
             for scanned_function in xrefs_dict:
@@ -543,6 +543,20 @@ class VulFiScanner:
                         if citem.to_specific_type.y == self.param:
                             return True
             return False
+        
+
+        def is_pointer(self):
+            if self.scanner_instance.hexrays:
+                return self.is_pointer_hexrays()
+            else:
+                return False
+            
+        def is_pointer_hexrays(self):
+            if self.param.op == ida_hexrays.cot_ref or self.param.op == ida_hexrays.cot_ptr:
+                return True
+            return False
+
+            
 
         def is_constant(self):
             if self.string_value() == "" and self.number_value() == None:
