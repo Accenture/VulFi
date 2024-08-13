@@ -108,7 +108,7 @@ class VulFiScanner:
             self.prototypes = json.load(proto_file)
         # get pointer size
 
-        if ida_ida.is_64bit():
+        if ida_ida.inf_is_64bit():
             self.ptr_size = 8
         elif ida_ida.inf_is_32bit_exactly():
             self.ptr_size = 4
