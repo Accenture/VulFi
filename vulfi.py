@@ -1589,5 +1589,3 @@ hooks.hook()
 def PLUGIN_ENTRY():
     return vulfi_fetch_t()
 
-def PLUGIN_ENTRY():
-    return vulfi_fetch_t()
