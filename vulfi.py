@@ -594,7 +594,7 @@ class VulFiScanner:
 
         def is_constant(self):
             if self.string_value() == "" and self.number_value() == None:
-                if self.param and self.param.op == ida_hexrays.cot_ref:
+                if self.scanner_instance.hexrays and self.param and self.param.op == ida_hexrays.cot_ref:
                     return False
                 asgs = self.__get_var_assignments()
                 if asgs: # asgs will be empty with no hexrays
